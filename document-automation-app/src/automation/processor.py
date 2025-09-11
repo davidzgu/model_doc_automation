@@ -1,3 +1,7 @@
+"""
+Can be placeholder for now
+"""
+
 class DocumentProcessor:
     def process_document(self, document):
         # Handle the input document and apply necessary transformations

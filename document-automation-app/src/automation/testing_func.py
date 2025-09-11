@@ -1,4 +1,7 @@
-# @Ricky & @Vivian to produce testing scripts for a simple Equity BSM Model
+""" 
+Action item:
+@Yifan to produce testing scripts for a simple Equity BSM Model
+"""
 
 class CommonTestingFunctions:
     def back_testing(self):
