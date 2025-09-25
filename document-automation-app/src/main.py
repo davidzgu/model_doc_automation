@@ -3,28 +3,29 @@ from langchain_utils.chain import LangChain
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from langchain_utils.python_tools import python_tool
 
-def main():
-    # Initialize the document processor
-    document_processor = DocumentProcessor()
+# def main():
+#     # Initialize the document processor
+#     document_processor = DocumentProcessor()
     
-    # Initialize the LangChain
-    lang_chain = LangChain()
+#     # Initialize the LangChain
+#     lang_chain = LangChain()
     
-    # Example input document
-    input_document = "path/to/input/document.pdf"
+#     # Example input document
+#     input_document = "path/to/input/document.pdf"
     
-    # Process the document
-    processed_document = document_processor.process_document(input_document)
+#     # Process the document
+#     processed_document = document_processor.process_document(input_document)
     
-    # Create a processing chain
-    processing_chain = lang_chain.create_chain()
+#     # Create a processing chain
+#     processing_chain = lang_chain.create_chain()
     
-    # Run the chain on the processed document
-    output = lang_chain.run_chain(processing_chain, processed_document)
+#     # Run the chain on the processed document
+#     output = lang_chain.run_chain(processing_chain, processed_document)
     
-    # Output the results
-    print("Output:", output)
+#     # Output the results
+#     print("Output:", output)
 
 
 def main_func():
@@ -53,18 +54,16 @@ def main_func():
         input_variables=["user_prompt", "script_output"],
         template=template
     )
-    chain = LLMChain(
-        llm=llm,
-        prompt=doc_prompt,
-        verbose=True
-    )
+    
+    chain = doc_prompt | llm
 
-    # Example usage:
-    user_prompt = "Generate a summary report of the testing results."
-    script_output = "Model output is 3.5, threshold is 4. the metric is that if output <= threshold, then the test failed."
 
-    document = chain.run(user_prompt=user_prompt, script_output=script_output)
-    print(document)
+    user_prompt = "Generate a summary report of the testing results. Note that the threshold of the result is 4 and the metric is that if output <= threshold, then the test failed."
+    script_output = python_tool("./document-automation-app/src/input/pricing_model.py")
+
+    document = chain.invoke(input={"user_prompt":user_prompt, "script_output":script_output})
+    print(document.content)
 
 if __name__ == "__main__":
+    # print(python_tool("./document-automation-app/src/input/pricing_model.py"))
     main_func()
