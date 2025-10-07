@@ -10,6 +10,6 @@ Future State:
   1) Executive Summary
        Prompt Engineering -> LLM -> Output 
   2) Write Analysis (read in table / chart, provide summary)
-  3) Run test (tool calling)
+  3) Run test (tool calling), automate testing script?
   Aggregation 
 
