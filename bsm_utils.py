@@ -13,7 +13,7 @@ from typing import Type, Optional
 
 
 @tool
-def test_1(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
+def bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
     """
     Calculates the Black-Scholes price for European call or put options.
     This function implements the Black-Scholes formula to compute the theoretical price of a European option
@@ -52,7 +52,7 @@ def test_1(option_type: str, S: float, K: float, T: float, r: float, sigma: floa
 
 
 @tool
-def test_2(filepath: str) -> str:
+def csv_loader(filepath: str) -> str:
     """
     Reads a CSV file from the specified filepath and returns the first five rows in JSON format without the index. If an error occurs during reading,
     returns an error message.
