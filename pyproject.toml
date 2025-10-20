@@ -1,0 +1,22 @@
+[project]
+name = "model_doc_automation"
+version = "0.1.0"
+description = "Document automation project using uv for dependency management."
+requires-python = ">=3.9"
+
+dependencies = [
+	"numpy",
+	"scipy",
+	"langchain",
+	"pandas",
+	"pydantic",
+	"matplotlib",
+	"langgraph",
+	"langchain-anthropic",
+	"langchain-core",
+	"python-dotenv",
+	"ipython",
+]
+
+[tool.uv]
+# Add uv-specific configuration here if needed

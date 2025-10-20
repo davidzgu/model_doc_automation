@@ -1,0 +1,196 @@
+import numpy as np
+from scipy.stats import norm
+from langchain.tools import tool
+import pandas as pd
+
+
+from pydantic import BaseModel, Field
+from langchain.tools import BaseTool
+from langchain_core.tools.base import ArgsSchema
+from langchain.agents import initialize_agent, AgentType
+import matplotlib.pyplot as plt
+import json
+from typing import Type, Optional
+
+
+@tool
+def bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
+    """
+    Calculates the Black-Scholes price for European call or put options.
+    This function implements the Black-Scholes formula to compute the theoretical price of a European option
+    (either 'call' or 'put') given the current stock price, strike price, time to expiration, risk-free interest rate,
+    and volatility of the underlying asset.
+    Args:
+        option_type (str): Type of the option, either 'call' or 'put'.
+        S (float): Current price of the underlying asset.
+        K (float): Strike price of the option.
+        T (float): Time to expiration in years.
+        r (float): Risk-free interest rate (annualized).
+        sigma (float): Volatility of the underlying asset (annualized standard deviation).
+    Returns:
+        str: The calculated option price as a string.
+    Raises:
+        ValueError: If option_type is not 'call' or 'put'.
+    # AI Agent Explanation:
+    # This function uses the Black-Scholes mathematical model to determine the fair price of a European option.
+    # It computes intermediate variables (d1 and d2) and applies the formula for either a call or put option.
+    # The result is returned as a string for further processing or display.
+    """
+    print(f"Testing: Calculating Black-Scholes price for a {option_type} option with S={S}, K={K}, T={T}, r={r}, sigma={sigma}")
+
+    option_type = option_type.lower()
+
+    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+
+    if option_type == 'call':
+        option_price = (S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2))
+    elif option_type == 'put':
+        option_price = (K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1))
+    else:
+        raise ValueError("option_type must be 'call' or 'put'")
+    return str(option_price)
+
+
+@tool
+def csv_loader(filepath: str) -> str:
+    """
+    Reads a CSV file from the specified filepath and returns the first five rows in JSON format without the index. If an error occurs during reading,
+    returns an error message.
+
+    Args:
+        filepath (str): The path to the CSV file to be read.
+
+    Returns:
+        str: JSON string of the first five rows of the CSV file, or an error message.
+    """
+
+    try:
+        df = pd.read_csv(filepath)
+        return df.head(5).to_json(index=False)
+    except Exception as e:
+        return f"Error reading CSV: {e}"
+
+
+@tool
+def create_line_chart(data_json: str, x_column: str, y_column: str, title: str = "Line Chart", x_label: str = "", y_label: str = "") -> str:
+    """
+    Creates a line chart from provided data.
+    Args:
+        data_json (str): JSON string representing the data (e.g., '[{"x": 1, "y": 2}, {"x": 2, "y": 4}]').
+        x_column (str): The name of the column to use for the x-axis.
+        y_column (str): The name of the column to use for the y-axis.
+        title (str): The title of the chart.
+        x_label (str): The label for the x-axis.
+        y_label (str): The label for the y-axis.
+    Returns:
+        str: A message indicating the chart was created and saved (or a path to the image).
+    """
+    try:
+        data = pd.read_json(data_json)
+        plt.figure(figsize=(10, 6))
+        plt.plot(data[x_column], data[y_column])
+        plt.title(title)
+        plt.xlabel(x_label if x_label else x_column)
+        plt.ylabel(y_label if y_label else y_column)
+        plt.grid(True)
+        # Save the chart to a file or a buffer
+        chart_path = "line_chart.png"
+        plt.savefig(chart_path)
+        plt.close()
+        return f"Line chart '{title}' created and saved to {chart_path}."
+    except Exception as e:
+        return f"Error creating chart: {e}"
+    
+
+# # Define proper input schema
+# class OptionPricingInput(BaseModel):
+#     option_type: str = Field(description="Type of option: 'call' or 'put'")
+#     S: float = Field(description="Current price of the underlying asset")
+#     K: float = Field(description="Strike price of the option")
+#     T: float = Field(description="Time to expiration in years")
+#     r: float = Field(description="Risk-free interest rate")
+#     sigma: float = Field(description="Volatility")
+
+#     class Config:
+#         arbitrary_types_allowed = True  # Allow unsupported types
+
+# @tool
+# class black_scholes(BaseTool):
+#     name: str = "Black-Scholes Calculator"
+#     description: str = "Calculates the Black-Scholes price for European call or put options."
+#     args_schema: Type[BaseModel] = OptionPricingInput
+
+#     def _run(self, option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
+#         """
+#         Calculates the Black-Scholes price for European call or put options.
+#         This function implements the Black-Scholes formula to compute the theoretical price of a European option
+#         (either 'call' or 'put') given the current stock price, strike price, time to expiration, risk-free interest rate,
+#         and volatility of the underlying asset.
+#         Args:
+#             option_type (str): Type of the option, either 'call' or 'put'.
+#             S (float): Current price of the underlying asset.
+#             K (float): Strike price of the option.
+#             T (float): Time to expiration in years.
+#             r (float): Risk-free interest rate (annualized).
+#             sigma (float): Volatility of the underlying asset (annualized standard deviation).
+#         Returns:
+#             str: The calculated option price as a string.
+#         Raises:
+#             ValueError: If option_type is not 'call' or 'put'.
+#         # AI Agent Explanation:
+#         # This function uses the Black-Scholes mathematical model to determine the fair price of a European option.
+#         # It computes intermediate variables (d1 and d2) and applies the formula for either a call or put option.
+#         # The result is returned as a string for further processing or display.
+#         """
+#         print(f"Testing: Calculating Black-Scholes price for a {option_type} option with S={S}, K={K}, T={T}, r={r}, sigma={sigma}")
+
+#         option_type = option_type.lower()
+
+#         d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+#         d2 = d1 - sigma * np.sqrt(T)
+
+#         if option_type == 'call':
+#             option_price = (S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2))
+#         elif option_type == 'put':
+#             option_price = (K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1))
+#         else:
+#             raise ValueError("option_type must be 'call' or 'put'")
+#         return str(option_price)
+
+
+
+# class ReadCSVInput(BaseModel):
+#     filepath: str = Field(description="The path to the CSV file to be read.")
+    
+#     class Config:
+#         arbitrary_types_allowed = True  # Allow unsupported types
+
+# @tool
+# class read_csv_tool(BaseTool):
+#     name: str = "CSV Reader"
+#     description: str = "Reads a CSV file and returns the first five rows in JSON format."
+#     # AI Agent Comment:
+#     # This function allows an AI agent to preview the contents of a CSV file.
+#     # It loads the file into a pandas DataFrame, extracts the top five rows, and converts them
+#     # to JSON for display or further processing. If the file cannot be read, it provides
+#     # an error message for debugging or user feedback.
+#     args_schema: Type[BaseModel] = ReadCSVInput
+ 
+#     def _run(self, filepath: str) -> str:
+#         """
+#         Reads a CSV file from the specified filepath and returns the first five rows in JSON format without the index. If an error occurs during reading,
+#         returns an error message.
+
+#         Args:
+#             filepath (str): The path to the CSV file to be read.
+
+#         Returns:
+#             str: JSON string of the first five rows of the CSV file, or an error message.
+#         """
+
+#         try:
+#             df = pd.read_csv(filepath)
+#             return df.head(5).to_json(index=False)
+#         except Exception as e:
+#             return f"Error reading CSV: {e}"

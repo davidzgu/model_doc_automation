@@ -2,7 +2,10 @@
 Action Item:
 @Andrew to build the LangChain processing chain for generating documents, can set up a time and discuss with me thought process and approach
 """
-
+"""
+Potential tutorials:
+https://python.langchain.com/docs/tutorials/agents/
+"""
 class LangChain:
     def create_chain(self):
         # Logic to set up the processing chain using LangChain components
