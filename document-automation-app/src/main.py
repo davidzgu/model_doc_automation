@@ -3,32 +3,10 @@ from langchain_utils.chain import LangChain
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from langchain_utils.python_tools import python_tool
-
-# def main():
-#     # Initialize the document processor
-#     document_processor = DocumentProcessor()
-    
-#     # Initialize the LangChain
-#     lang_chain = LangChain()
-    
-#     # Example input document
-#     input_document = "path/to/input/document.pdf"
-    
-#     # Process the document
-#     processed_document = document_processor.process_document(input_document)
-    
-#     # Create a processing chain
-#     processing_chain = lang_chain.create_chain()
-    
-#     # Run the chain on the processed document
-#     output = lang_chain.run_chain(processing_chain, processed_document)
-    
-#     # Output the results
-#     print("Output:", output)
 
 
-def main_func():
+
+def main():
 
 
 
@@ -66,4 +44,4 @@ def main_func():
 
 if __name__ == "__main__":
     # print(python_tool("./document-automation-app/src/input/pricing_model.py"))
-    main_func()
+    main()
