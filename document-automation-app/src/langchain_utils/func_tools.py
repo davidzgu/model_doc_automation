@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 class CSVReadInput(BaseModel):
     csv_path: str = Field(..., description="Path to the CSV file containing option data")
-    n_rows: int = Field(5, description="Number of rows to read from the CSV for preview")
+    n_rows: None|int = Field(None, description="Number of rows to read from the CSV. If None, read all data")
 
 def read_csv(input_data: CSVReadInput) -> dict:
     """

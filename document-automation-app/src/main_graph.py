@@ -26,7 +26,8 @@ def agent_node(state: State) -> State:
 
     system_prompt = """
     You are a quantitative testing coordinator.
-    Based on the user's request and available tests, read the test input from given file path and then run the corresponding tests with input.
+    Based on the user's request on **tests** and available tools, read the test input from given file path and then run the corresponding tests with input.
+    **Note: your job is only doing the tests and output the useful information. Ignore any user's requests on reporting part.**
     """
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
@@ -60,7 +61,7 @@ def report_node(state: State) -> State:
     }
 
     prompt = f"""
-    You are a quantitative analyst. Based on the following context, summarize the results in a clear report:
+    You are a senior quantitative analyst. Leverage the tests results from another analysis and follow the user's original request:
 
     Context:
     {context}
@@ -87,7 +88,7 @@ if __name__ == "__main__":
     user_prompt = (
         "Read the CSV file at 'D:\ML_Experiment\model_doc_automation\document-automation-app\src\input\data.csv' (only 3 rows),"
         "then run the gamma positive test and digital options test, "
-        "based on the results, generate a short analyze report."
+        "based on the results, generate a better analyze report. Divide the 2 tests into 2 sections and write a comprehensive summary at end of report. Also add an executive summary at the beginning of report."
     )
     result = app.invoke({"user_prompt": user_prompt})
-    print("\nFinal Output:\n", result)
+    print("\nFinal Output:\n", result['report'])
