@@ -35,7 +35,7 @@ def bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sig
     # It computes intermediate variables (d1 and d2) and applies the formula for either a call or put option.
     # The result is returned as a string for further processing or display.
     """
-    print(f"Testing: Calculating Black-Scholes price for a {option_type} option with S={S}, K={K}, T={T}, r={r}, sigma={sigma}")
+    #print(f"Testing: Calculating Black-Scholes price for a {option_type} option with S={S}, K={K}, T={T}, r={r}, sigma={sigma}")
 
     option_type = option_type.lower()
 
@@ -88,7 +88,7 @@ def greeks_calculator(option_type: str, S: float, K: float, T: float, r: float, 
         str: JSON string containing price, delta, gamma, vega, rho, theta
     """
     try:
-        print(f"Testing: Calculating Greeks for a {option_type} option with S={S}, K={K}, T={T}, r={r}, sigma={sigma}")
+        #print(f"Testing: Calculating Greeks for a {option_type} option with S={S}, K={K}, T={T}, r={r}, sigma={sigma}")
 
         option_type = option_type.lower()
 
@@ -130,6 +130,55 @@ def greeks_calculator(option_type: str, S: float, K: float, T: float, r: float, 
 
 
 @tool
+def sensitivity_test_new(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
+    """
+        Runs a sensitivity test by perturbing the spot price around S and computing Greeks at each perturbed spot.
+
+    Args:
+        option_type (str): 'call' or 'put'
+        S (float): Base spot price
+        K (float): Strike price
+        T (float): Time to expiration in years
+        r (float): Risk-free rate
+        sigma (float): Volatility
+
+    Returns:
+        str: JSON list of sensitivity results, each entry contains spot_change and greeks
+    """
+    spot_changes = np.arange(-0.025, 0.026, 0.005)
+    results = []
+
+    for change in spot_changes:
+        new_S = S * (1 + float(change))
+        # Call greeks_calculator as a tool via .run with a single dict payload
+        resp = greeks_calculator.run({
+            "option_type": option_type,
+            "S": float(new_S),
+            "K": float(K),
+            "T": float(T),
+            "r": float(r),
+            "sigma": float(sigma),
+        })
+
+        greeks = json.loads(resp)
+
+        entry = {"spot_change": float(change)}
+        for k in ("price", "delta", "gamma", "vega", "rho", "theta"):
+            entry[k] = greeks.get(k)
+
+        results.append(entry)
+
+    # Build a pandas DataFrame table for convenience
+    table_df = pd.DataFrame(results)
+
+    # Return both the raw results list and a table representation (as list of records)
+    return json.dumps({
+        "results": results,
+        "table": table_df.to_dict(orient="records")
+    })
+
+
+@tool
 def sensitivity_test(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
     """
     Runs a sensitivity test by perturbing the spot price around S and computing Greeks at each perturbed spot.
@@ -153,8 +202,20 @@ def sensitivity_test(option_type: str, S: float, K: float, T: float, r: float, s
 
         for change in spot_changes:
             new_S = S * (1 + float(change))
-            # reuse greeks_calculator to compute greeks for the perturbed spot
-            resp = greeks_calculator(option_type, new_S, K, T, r, sigma)
+            # Call the greeks_calculator tool via its .run API with a single dict payload
+            try:
+                resp = greeks_calculator.run({
+                    "option_type": option_type,
+                    "S": float(new_S),
+                    "K": float(K),
+                    "T": float(T),
+                    "r": float(r),
+                    "sigma": float(sigma),
+                })
+            except TypeError:
+                # Fallback: some LangChain versions may allow calling the tool object directly
+                resp = greeks_calculator(option_type, new_S, K, T, r, sigma)
+
             try:
                 greeks = json.loads(resp)
             except Exception:
