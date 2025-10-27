@@ -1,5 +1,9 @@
 langchain
+langchain-core
+langchain-ollama
+langgraph
 pandas
 numpy
+scipy
 requests
 python-dotenv

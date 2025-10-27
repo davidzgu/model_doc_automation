@@ -5,11 +5,10 @@ import pandas as pd
 
 
 from pydantic import BaseModel, Field
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 from langchain_core.tools.base import ArgsSchema
-from langchain.agents import initialize_agent, AgentType
 import json
-from typing import Type, Optional
+from typing import Type, Optional, Union, Dict, Any
 
 
 @tool
@@ -329,3 +328,77 @@ def sensitivity_test(option_type: str, S: float, K: float, T: float, r: float, s
 #             return df.head(5).to_json(index=False)
 #         except Exception as e:
 #             return f"Error reading CSV: {e}"
+
+
+@tool
+def batch_bsm_calculator(csv_data: Union[str, Dict[str, Any]]) -> str:
+    """
+    Batch calculates Black-Scholes option prices for multiple options from CSV data.
+    This tool is more efficient than calling bsm_calculator multiple times.
+
+    Args:
+        csv_data (str): JSON string or dict of CSV data with columns: option_type, S, K, T, r, sigma
+                       (as returned by csv_loader tool)
+
+    Returns:
+        str: Markdown table with input parameters and calculated option prices for each row
+
+    Example:
+        Input CSV data should have columns: option_type, S, K, T, r, sigma
+        Returns a formatted markdown table with all inputs and calculated prices
+    """
+    try:
+        # Parse the JSON data (handle both string and dict)
+        if isinstance(csv_data, str):
+            data = json.loads(csv_data)
+        elif isinstance(csv_data, dict):
+            data = csv_data
+        else:
+            return f"Error: csv_data must be a string or dict, got {type(csv_data)}"
+
+        # Convert to DataFrame for easier processing
+        df = pd.DataFrame(data)
+
+        # Required columns
+        required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            return f"Error: Missing required columns: {missing_cols}. Available columns: {list(df.columns)}"
+
+        # Calculate option price for each row
+        prices = []
+        for idx, row in df.iterrows():
+            option_type = str(row['option_type']).lower()
+            S = float(row['S'])
+            K = float(row['K'])
+            T = float(row['T'])
+            r = float(row['r'])
+            sigma = float(row['sigma'])
+
+            # Calculate d1 and d2
+            d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+            d2 = d1 - sigma * np.sqrt(T)
+
+            # Calculate option price
+            if option_type == 'call':
+                price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+            elif option_type == 'put':
+                price = K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+            else:
+                price = None
+
+            prices.append(price)
+
+        # Add prices to DataFrame
+        df['BSM_Price'] = prices
+
+        # Format as markdown table
+        result = "## Black-Scholes Option Pricing Results\n\n"
+        result += df.to_markdown(index=False)
+
+        return result
+
+    except json.JSONDecodeError as e:
+        return f"Error: Invalid JSON format. {str(e)}"
+    except Exception as e:
+        return f"Error calculating option prices: {str(e)}"
