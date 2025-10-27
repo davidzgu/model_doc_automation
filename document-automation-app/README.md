@@ -58,3 +58,38 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
+
+
+
+
+### Agent Pipeline
+
+```
+Input CSV
+    ↓
+┌─────────────────────┐
+│ Agent 1: Data Loader│  → Load CSV data
+└─────────────────────┘
+    ↓
+┌─────────────────────┐
+│ Agent 2: Calculator │  → Calculate BSM prices & Greeks
+└─────────────────────┘
+    ↓
+┌─────────────────────┐
+│ Agent 3: Tester     │  → Run validation tests
+└─────────────────────┘
+    ↓
+┌─────────────────────┐
+│ Agent 4: Summary    │  → Generate text summary
+└─────────────────────┘
+    ↓
+┌─────────────────────┐
+│ Agent 5: Charts     │  → Create visualizations
+└─────────────────────┘
+    ↓
+┌─────────────────────┐
+│ Agent 6: Assembler  │  → Create final HTML report
+└─────────────────────┘
+    ↓
+Final Report (HTML)
+```
