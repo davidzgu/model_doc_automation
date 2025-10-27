@@ -7,3 +7,5 @@ numpy
 scipy
 requests
 python-dotenv
+matplotlib
+tabulate
