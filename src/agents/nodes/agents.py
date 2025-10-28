@@ -25,8 +25,7 @@ class Agent1_DataLoader:
     def __init__(self, llm):
         self.agent = create_react_agent(
             model=llm,
-            tools=get_agent1_tools(),
-            state_schema=OptionAnalysisState
+            tools=get_agent1_tools()
         )
 
     def __call__(self, state: OptionAnalysisState) -> Dict[str, Any]:
@@ -84,8 +83,7 @@ class Agent2_Calculator:
     def __init__(self, llm):
         self.agent = create_react_agent(
             model=llm,
-            tools=get_agent2_tools(),
-            state_schema=OptionAnalysisState
+            tools=get_agent2_tools()
         )
 
     def __call__(self, state: OptionAnalysisState) -> Dict[str, Any]:
@@ -125,7 +123,7 @@ Return:
                 if hasattr(msg, 'name'):
                     if msg.name == 'batch_bsm_calculator':
                         calculation_results = msg.content
-                    elif msg.name == 'sensitivity_test':
+                    elif msg.name == 'w':
                         import json
                         try:
                             greeks_data = json.loads(msg.content)
@@ -154,8 +152,7 @@ class Agent3_Tester:
     def __init__(self, llm):
         self.agent = create_react_agent(
             model=llm,
-            tools=get_agent3_tools(),
-            state_schema=OptionAnalysisState
+            tools=get_agent3_tools()
         )
 
     def __call__(self, state: OptionAnalysisState) -> Dict[str, Any]:
@@ -224,8 +221,7 @@ class Agent4_SummaryWriter:
     def __init__(self, llm):
         self.agent = create_react_agent(
             model=llm,
-            tools=get_agent4_tools(),
-            state_schema=OptionAnalysisState
+            tools=get_agent4_tools()
         )
 
     def __call__(self, state: OptionAnalysisState) -> Dict[str, Any]:
@@ -286,8 +282,7 @@ class Agent5_ChartGenerator:
     def __init__(self, llm):
         self.agent = create_react_agent(
             model=llm,
-            tools=get_agent5_tools(),
-            state_schema=OptionAnalysisState
+            tools=get_agent5_tools()
         )
 
     def __call__(self, state: OptionAnalysisState) -> Dict[str, Any]:
@@ -347,8 +342,7 @@ class Agent6_ReportAssembler:
     def __init__(self, llm):
         self.agent = create_react_agent(
             model=llm,
-            tools=get_agent6_tools(),
-            state_schema=OptionAnalysisState
+            tools=get_agent6_tools()
         )
 
     def __call__(self, state: OptionAnalysisState) -> Dict[str, Any]:

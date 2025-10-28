@@ -13,6 +13,23 @@ from src.test_tools import run_greeks_validation_test, run_sensitivity_analysis_
 from src.chart_tools import create_option_price_chart, create_greeks_chart, create_summary_charts
 from src.report_tools import load_template, assemble_html_report
 
+from src.bsm_utils import (
+    bsm_calculator,
+    csv_loader,
+    greeks_calculator,
+    sensitivity_test,
+    batch_bsm_calculator,
+)
+
+def get_tools() -> List[BaseTool]:
+    return [
+        csv_loader,
+        batch_bsm_calculator,  # 批量计算工具（推荐）
+        bsm_calculator,        # 单次计算工具（备用）
+        greeks_calculator,
+        sensitivity_test,
+    ]
+
 
 def get_agent1_tools() -> List[BaseTool]:
     """

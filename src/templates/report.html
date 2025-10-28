@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Option Analysis Report</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .section {
+            background-color: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { margin: 0; }
+        h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        .chart {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .chart img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .timestamp {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            text-align: right;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Option Analysis Report</h1>
+        <p>Comprehensive BSM Option Pricing Analysis</p>
+    </div>
+
+    <div class="section">
+        <h2>Summary</h2>
+        Based on the provided template, here is a comprehensive summary of the option analysis:<br>
+<br>
+# Option Analysis Summary<br>
+<h3>Overview<br>
+This report provides an in-depth analysis of various options using the Black-Scholes-Merton (BSM) model. The analysis includes call and put options with different strike prices, spot prices, maturities, risk-free rates, and volatilities.<br>
+<h3>Calculation Results<br>
+The BSM option pricing results are summarized below:<br>
+<br>
+|   K |   S |   T | Option Type  |     r |   σ    |   BSM Price |<br>
+|----:|----:|----:|:-------------|------:|--------:|------------:|<br>
+| 105 | 100 | 1.0 | Call         | 0.05  | 0.200  |     8.02135 |<br>
+| 106 | 102 | 0.9 | Put          | 0.045 | 0.190  |     7.21424 |<br>
+| 104 |  98 | 0.8 | Call         | 0.048 | 0.210  |     6.41575 |<br>
+| 107 | 101 | 0.7 | Call         | 0.047 | 0.180  |     4.95296 |<br>
+| 103 |  99 | 0.6 | Put          | 0.046 | 0.220  |     7.3777  |<br>
+<h3>Test Results<br>
+No specific tests were conducted for this analysis.<br>
+<h3>Key Findings<br>
+- The BSM price of the call option with a strike price of $105 and maturity of 1 year is highest at approximately $8.02.<br>
+- For put options, the BSM price decreases as the strike price increases or the maturity decreases.<br>
+- The volatility has a significant impact on the BSM prices; higher volatilities generally lead to higher option prices.<br>
+<br>
+---<br>
+*Generated on [timestamp]*
+    </div>
+
+    <div class="section">
+        <h2>Visualizations</h2>
+        <p>No charts generated</p>
+    </div>
+
+    <div class="timestamp">
+        Generated on 2025-10-27 22:04:41
+    </div>
+</body>
+</html>
