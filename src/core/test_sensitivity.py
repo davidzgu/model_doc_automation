@@ -3,9 +3,9 @@ import sys
 import json
 
 # Ensure the local src directory is importable for tests
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from bsm_utils import sensitivity_test
+from src.core.bsm_calculator import sensitivity_test
 
 
 def test_sensitivity_length_and_fields():

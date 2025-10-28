@@ -29,13 +29,17 @@ class Tester:
             task_message = HumanMessage(content=f"""
 Run validation tests on the option calculations.
 
-Data: {csv_data}
+Execute the following tests from src/core:
+1. run_greeks_validation_test - runs actual pytest functions:
+   - test_greeks_call_basic: validates basic Greeks calculation (delta in [0,1], price > 0)
+   - test_greeks_put_call_parity: validates put-call parity relationship
 
-Use the following tools:
-1. run_greeks_validation_test - to validate Greeks calculations
-2. run_sensitivity_analysis_test - to test sensitivity analysis
+2. run_sensitivity_analysis_test - runs actual pytest function:
+   - test_sensitivity_length_and_fields: validates sensitivity analysis returns 11 data points with all required fields
 
-Report the test results.
+These tools wrap the actual test functions from test_greeks.py and test_sensitivity.py.
+
+Report the test results including pass/fail status for each test.
 """)
 
             result = self.agent.invoke({

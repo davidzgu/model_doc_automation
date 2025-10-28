@@ -1,5 +1,5 @@
 import json
-from document_automation_app.src.bsm_utils import greeks_calculator
+from src.core.bsm_calculator import greeks_calculator
 
 
 def test_greeks_call_basic():
