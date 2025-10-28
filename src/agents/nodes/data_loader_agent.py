@@ -42,22 +42,22 @@ Use the csv_loader tool to read the CSV file. Return the data in JSON format.
                             csv_data = json.loads(msg.content)
                             return {
                                 "csv_data": csv_data,
-                                "agent1_status": "completed",
-                                "current_agent": "agent1",
+                                "agent_status": "completed",
+                                "current_agent": "data_loader",
                                 "workflow_status": "in_progress"
                             }
                         except:
                             pass
 
             return {
-                "agent1_status": "failed",
-                "current_agent": "agent1",
+                "agent_status": "failed",
+                "current_agent": "data_loader",
                 "errors": ["Failed to load CSV data"]
             }
 
         except Exception as e:
             return {
-                "agent1_status": "error",
-                "current_agent": "agent1",
-                "errors": [f"Agent 1 error: {str(e)}"]
+                "agent_status": "error",
+                "current_agent": "data_loader",
+                "errors": [f"Error: {str(e)}"]
             }

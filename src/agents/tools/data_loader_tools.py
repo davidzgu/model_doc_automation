@@ -1,7 +1,7 @@
 from typing import List
 from langchain_core.tools import BaseTool
 
-from core.bsm_calculator import csv_loader
+from src.core.data_loader import csv_loader
 
 def get_data_loader_tools() -> List[BaseTool]:
     """

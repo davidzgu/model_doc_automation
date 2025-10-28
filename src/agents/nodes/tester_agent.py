@@ -3,7 +3,7 @@ from langchain_core.messages import HumanMessage
 from typing import Dict, Any
 
 from src.agents.state import OptionAnalysisState
-from src.agents.tools.test_tools import get_test_tools
+from src.agents.tools.tester_tools import get_tester_tools
 
 
 
@@ -13,7 +13,7 @@ class Tester:
     def __init__(self, llm):
         self.agent = create_react_agent(
             model=llm,
-            tools=get_test_tools()
+            tools=get_tester_tools()
         )
 
     def __call__(self, state: OptionAnalysisState) -> Dict[str, Any]:
@@ -22,7 +22,7 @@ class Tester:
             csv_data = state.get("csv_data")
             if not csv_data:
                 return {
-                    "agent3_status": "skipped",
+                    "tester_agent_status": "skipped",
                     "test_results": {"status": "skipped", "message": "No data to test"}
                 }
 
@@ -67,14 +67,14 @@ Report the test results including pass/fail status for each test.
 
             return {
                 "test_results": test_results,
-                "agent3_status": "completed",
-                "current_agent": "agent3",
+                "tester_agent_status": "completed",
+                "current_agent": "tester",
                 "workflow_status": "in_progress"
             }
 
         except Exception as e:
             return {
-                "agent3_status": "error",
-                "current_agent": "agent3",
-                "errors": [f"Agent 3 error: {str(e)}"]
+                "tester_agent_status": "error",
+                "current_agent": "tester",
+                "errors": [f"Error: {str(e)}"]
             }

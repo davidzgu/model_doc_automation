@@ -15,8 +15,8 @@ from langchain_core.tools import tool
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'core')))
 
 # Import the actual pytest test functions
-from test_greeks import test_greeks_call_basic, test_greeks_put_call_parity
-from test_sensitivity import test_sensitivity_length_and_fields
+from src.core.test_greeks import test_greeks_call_basic, test_greeks_put_call_parity
+from src.core.test_sensitivity import test_sensitivity_length_and_fields
 
 
 @tool
@@ -155,7 +155,7 @@ def run_sensitivity_analysis_test() -> str:
     return json.dumps(test_results, indent=2)
 
 
-def get_test_tools():
+def get_tester_tools():
     """Return list of test tools for the Test Agent."""
     return [
         run_greeks_validation_test,

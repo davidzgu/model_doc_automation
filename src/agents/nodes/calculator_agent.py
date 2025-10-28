@@ -23,8 +23,8 @@ class Calculator:
             csv_data = state.get("csv_data")
             if not csv_data:
                 return {
-                    "agent2_status": "failed",
-                    "errors": ["No CSV data available from Agent 1"]
+                    "calculator_agent_status": "failed",
+                    "errors": ["No CSV data available in statue"]
                 }
 
             # Create task message
@@ -49,29 +49,39 @@ Return:
             # Extract calculation results
             calculation_results = None
             greeks_data = None
+            sensitivity_data = None
 
             for msg in reversed(result.get("messages", [])):
                 if hasattr(msg, 'name'):
                     if msg.name == 'batch_bsm_calculator':
+                        # batch_bsm_calculator 返回 markdown 字符串，直接使用
                         calculation_results = msg.content
-                    elif msg.name == 'w':
+                    elif msg.name == 'greeks_calculator':  # 修复: 'w' → 'greeks_calculator'
+                        # greeks_calculator 返回 JSON 字符串，需要解析
                         import json
                         try:
                             greeks_data = json.loads(msg.content)
+                        except:
+                            pass
+                    elif msg.name == 'sensitivity_test':  # 可选：也可以获取敏感性测试数据
+                        import json
+                        try:
+                            sensitivity_data = json.loads(msg.content)
                         except:
                             pass
 
             return {
                 "calculation_results": calculation_results or "No calculation results",
                 "greeks_data": greeks_data,
-                "agent2_status": "completed",
-                "current_agent": "agent2",
+                "sensitivity_data": sensitivity_data,
+                "calculator_agent_status": "completed",
+                "current_agent": "calculator",
                 "workflow_status": "in_progress"
             }
 
         except Exception as e:
             return {
-                "agent2_status": "error",
-                "current_agent": "agent2",
-                "errors": [f"Agent 2 error: {str(e)}"]
+                "calculator_agent_status": "error",
+                "current_agent": "calculator",
+                "errors": [f"Error: {str(e)}"]
             }

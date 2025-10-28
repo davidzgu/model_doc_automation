@@ -28,7 +28,7 @@ class OptionAnalysisState(TypedDict):
     csv_data: Optional[Dict[str, Any]]
     """Loaded CSV data in dict format from Agent 1"""
 
-    agent1_status: Optional[str]
+    data_loader_agent_status: Optional[str]
     """Status of Agent 1 execution"""
 
     # ===== Agent 2 Output: Calculation =====
@@ -38,21 +38,24 @@ class OptionAnalysisState(TypedDict):
     greeks_data: Optional[Dict[str, Any]]
     """Detailed Greeks data in dict format for charting"""
 
-    agent2_status: Optional[str]
+    sensitivity_data: Optional[Dict[str, Any]]
+    """Detailed Greeks data in dict format for charting"""
+
+    calculator_agent_status: Optional[str]
     """Status of Agent 2 execution"""
 
     # ===== Agent 3 Output: Testing =====
     test_results: Optional[Dict[str, Any]]
     """Test results from Agent 3 (pass/fail status, details)"""
 
-    agent3_status: Optional[str]
+    tester_agent_status: Optional[str]
     """Status of Agent 3 execution"""
 
     # ===== Agent 4 Output: Summary Writer =====
     summary_text: Optional[str]
     """Written summary in markdown format from Agent 4"""
 
-    agent4_status: Optional[str]
+    summarty_writer_agnet_status: Optional[str]
     """Status of Agent 4 execution"""
 
     # ===== Agent 5 Output: Chart Generator =====
@@ -62,7 +65,7 @@ class OptionAnalysisState(TypedDict):
     chart_descriptions: Optional[Dict[str, str]]
     """Descriptions of each chart"""
 
-    agent5_status: Optional[str]
+    chart_generator_agent_status: Optional[str]
     """Status of Agent 5 execution"""
 
     # ===== Agent 6 Output: Report Assembler =====
@@ -72,7 +75,7 @@ class OptionAnalysisState(TypedDict):
     final_report_html: Optional[str]
     """HTML content of the final report"""
 
-    agent6_status: Optional[str]
+    report_assenbler_agent_status: Optional[str]
     """Status of Agent 6 execution"""
 
     # ===== Workflow Metadata =====
