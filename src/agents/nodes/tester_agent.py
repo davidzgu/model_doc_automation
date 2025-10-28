@@ -27,19 +27,31 @@ class Tester:
                 }
 
             task_message = HumanMessage(content=f"""
-Run validation tests on the option calculations.
+Run comprehensive validation tests on ALL options loaded from CSV.
 
-Execute the following tests from src/core:
-1. run_greeks_validation_test - runs actual pytest functions:
-   - test_greeks_call_basic: validates basic Greeks calculation (delta in [0,1], price > 0)
-   - test_greeks_put_call_parity: validates put-call parity relationship
+CSV Data: {csv_data}
 
-2. run_sensitivity_analysis_test - runs actual pytest function:
-   - test_sensitivity_length_and_fields: validates sensitivity analysis returns 11 data points with all required fields
+Execute the following validation tests:
 
-These tools wrap the actual test functions from test_greeks.py and test_sensitivity.py.
+1. batch_greeks_validator - Validates Greeks for ALL {len(csv_data) if isinstance(csv_data, list) else 'loaded'} options:
+   - For each option, calculates Greeks using its actual parameters
+   - Validates: price > 0
+   - Validates: delta in correct range (call: [0,1], put: [-1,0])
+   - Validates: gamma >= 0, vega >= 0
+   - Returns detailed pass/fail results for each option
 
-Report the test results including pass/fail status for each test.
+2. validate_put_call_parity - Tests put-call parity for paired options:
+   - Finds call/put pairs with matching parameters (S, K, T, r, sigma)
+   - Validates: C - P ≈ S - K*e^(-rT)
+   - Reports which pairs pass/fail the parity test
+
+3. validate_sensitivity - Runs sensitivity analysis on first option:
+   - Tests spot price sensitivity (-2.5% to +2.5%)
+   - Validates 11 data points with all required Greeks fields
+   - Ensures no calculation errors
+
+Each tool accepts the csv_data as input and processes all relevant options.
+Report the overall test status, number of options tested, and any validation failures found.
 """)
 
             result = self.agent.invoke({
@@ -47,11 +59,14 @@ Report the test results including pass/fail status for each test.
                 "messages": [task_message]
             })
 
-            # Extract test results
+            # Extract test results from tool messages
             test_results = {"tests_run": [], "overall_status": "unknown"}
 
+            # Tool names to look for
+            tool_names = ['batch_greeks_validator', 'validate_put_call_parity', 'validate_sensitivity']
+
             for msg in reversed(result.get("messages", [])):
-                if hasattr(msg, 'name') and 'test' in msg.name:
+                if hasattr(msg, 'name') and msg.name in tool_names:
                     import json
                     try:
                         test_data = json.loads(msg.content)
