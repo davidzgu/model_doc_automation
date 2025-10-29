@@ -7,7 +7,7 @@ from src.agents.tools.summary_writer_tools import get_summary_writer_tools
 
 
 
-class Agent4_SummaryWriter:
+class SummaryWriter:
     """Agent 4: Write textual summary"""
 
     def __init__(self, llm):
@@ -21,24 +21,23 @@ class Agent4_SummaryWriter:
         try:
             calculation_results = state.get("calculation_results", "No results")
             test_results = state.get("test_results", {})
+            csv_data = state.get("csv_data", {})
 
             task_message = HumanMessage(content=f"""
-Write a comprehensive summary of the option analysis.
+Generate a comprehensive summary report using the generate_summary tool.
 
-Calculation Results:
-{calculation_results}
+Input data:
+- Calculation Results: {calculation_results}
+- Test Results: {test_results}
+- CSV Data: {csv_data}
 
-Test Results:
-{test_results}
+The tool will:
+1. Load the template from src/templates/summary_template.md
+2. Fill in all placeholders with actual data
+3. Generate a professional markdown report
+4. If template not found, create a structured summary automatically
 
-Create a professional markdown summary with the following sections:
-1. Overview
-2. Key Findings
-3. Calculation Summary
-4. Test Results Summary
-5. Conclusions
-
-Keep it concise and clear.
+Call the generate_summary tool with all three inputs.
 """)
 
             result = self.agent.invoke({
@@ -46,23 +45,23 @@ Keep it concise and clear.
                 "messages": [task_message]
             })
 
-            # Get summary from last AI message
+            # Extract summary from tool message
             summary_text = ""
             for msg in reversed(result.get("messages", [])):
-                if hasattr(msg, 'content') and len(msg.content) > 100:
+                if hasattr(msg, 'name') and msg.name == 'generate_summary':
                     summary_text = msg.content
                     break
 
             return {
                 "summary_text": summary_text or "Summary generation failed",
-                "agent4_status": "completed",
-                "current_agent": "agent4",
+                "agent_status": "completed",
+                "current_agent": "summary writer",
                 "workflow_status": "in_progress"
             }
 
         except Exception as e:
             return {
-                "agent4_status": "error",
-                "current_agent": "agent4",
-                "errors": [f"Agent 4 error: {str(e)}"]
+                "agent_status": "error",
+                "current_agent": "summary writer",
+                "errors": [f"Error: {str(e)}"]
             }
