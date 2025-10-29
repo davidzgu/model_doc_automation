@@ -34,12 +34,12 @@ def test_calculator_agent():
 
     # Create mock state with csv_data (simulating Agent 1 output)
     mock_csv_data = {
-        "option_type": {0: "call", 1: "put"},
-        "S": {0: 100.0, 1: 105.0},
-        "K": {0: 100.0, 1: 100.0},
-        "T": {0: 1.0, 1: 0.5},
-        "r": {0: 0.05, 1: 0.05},
-        "sigma": {0: 0.2, 1: 0.25}
+        "option_type": {0: "call", 1: "put", 2: "call", 3: "put"},
+        "S": {0: 100.0, 1: 100.0, 2: 105.0, 3: 105.0},
+        "K": {0: 100.0, 1: 100.0, 2: 100.0, 3: 100.0},
+        "T": {0: 1.0, 1: 1.0, 2: 0.5, 3: 0.5},
+        "r": {0: 0.05, 1: 0.05, 2: 0.05, 3: 0.05},
+        "sigma": {0: 0.2, 1: 0.2, 2: 0.25, 3: 0.25}
     }
 
     initial_state = {
