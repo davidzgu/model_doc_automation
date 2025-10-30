@@ -6,7 +6,7 @@ from src.agents.state import OptionAnalysisState
 from src.agents.tools.calculator_tools import get_calculation_tools
 
 
-
+import json
 
 class Calculator:
     """Agent 2: Calculate BSM prices and Greeks"""
