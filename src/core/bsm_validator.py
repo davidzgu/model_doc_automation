@@ -206,6 +206,12 @@ def batch_greeks_validator(csv_data: Union[str, Dict[str, Any]]) -> str:
         }
 
         for idx, row in df.iterrows():
+            # 🔬 调试探针 6
+            print(f"\n🔬 探针 6: 处理第 {idx} 行")
+            print(f"row 类型: {type(row)}")
+            print(f"row 内容: {row.to_dict()}")
+            print(f"row['option_type'] = {row['option_type']} (类型: {type(row['option_type'])})")
+            
             option_type = str(row['option_type']).lower()
             S, K, T, r, sigma = float(row['S']), float(row['K']), float(row['T']), float(row['r']), float(row['sigma'])
 
