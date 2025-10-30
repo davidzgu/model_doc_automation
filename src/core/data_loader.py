@@ -19,6 +19,6 @@ def csv_loader(filepath: str) -> str:
 
     try:
         df = pd.read_csv(filepath)
-        return df.head(5).to_json(index=False)
+        return df.to_json(index=False)
     except Exception as e:
         return f"Error reading CSV: {e}"

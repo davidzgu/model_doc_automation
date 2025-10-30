@@ -47,17 +47,6 @@ Execute the following validation tests:
    - Validates: gamma >= 0, vega >= 0
    - Returns detailed pass/fail results for each option
 
-2. validate_put_call_parity - Tests put-call parity for paired options:
-   - Finds call/put pairs with matching parameters (S, K, T, r, sigma)
-   - Validates: C - P ≈ S - K*e^(-rT)
-   - Reports which pairs pass/fail the parity test
-
-3. validate_sensitivity - Runs sensitivity analysis on first option:
-   - Tests spot price sensitivity (-2.5% to +2.5%)
-   - Validates 11 data points with all required Greeks fields
-   - Ensures no calculation errors
-
-Each tool accepts the csv_data as input and processes all relevant options.
 Report the overall test status, number of options tested, and any validation failures found.
 """)
 
