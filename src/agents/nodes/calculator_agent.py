@@ -33,11 +33,10 @@ Calculate Black-Scholes-Merton option prices and Greeks for the following data:
 
 {csv_data}
 
-Use batch_bsm_calculator for price calculation and sensitivity_test for one sample option to get Greeks data.
+Use batch_bsm_calculator for price calculation.
 
 Return:
-1. A markdown table with all option prices
-2. Greeks sensitivity analysis for the first option
+1. A json string with all option prices
 """)
 
             # Invoke agent
@@ -55,25 +54,25 @@ Return:
                 if hasattr(msg, 'name'):
                     if msg.name == 'batch_bsm_calculator':
                         # batch_bsm_calculator 返回 markdown 字符串，直接使用
-                        calculation_results = msg.content
-                    elif msg.name == 'greeks_calculator':  # 修复: 'w' → 'greeks_calculator'
-                        # greeks_calculator 返回 JSON 字符串，需要解析
-                        import json
-                        try:
-                            greeks_data = json.loads(msg.content)
-                        except:
-                            pass
-                    elif msg.name == 'sensitivity_test':  # 可选：也可以获取敏感性测试数据
-                        import json
-                        try:
-                            sensitivity_data = json.loads(msg.content)
-                        except:
-                            pass
+                        calculation_results = json.loads(msg.content)
+                    # elif msg.name == 'greeks_calculator':  # 修复: 'w' → 'greeks_calculator'
+                    #     # greeks_calculator 返回 JSON 字符串，需要解析
+                    #     import json
+                    #     try:
+                    #         greeks_data = json.loads(msg.content)
+                    #     except:
+                    #         pass
+                    # elif msg.name == 'sensitivity_test':  # 可选：也可以获取敏感性测试数据
+                    #     import json
+                    #     try:
+                    #         sensitivity_data = json.loads(msg.content)
+                    #     except:
+                    #         pass
 
             return {
                 "calculation_results": calculation_results or "No calculation results",
-                "greeks_data": greeks_data,
-                "sensitivity_data": sensitivity_data,
+                # "greeks_data": greeks_data,
+                # "sensitivity_data": sensitivity_data,
                 "calculator_agent_status": "completed",
                 "current_agent": "calculator",
                 "workflow_status": "in_progress"
