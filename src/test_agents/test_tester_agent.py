@@ -36,22 +36,22 @@ def test_tester_agent():
     # Create mock state with csv_data and calculation_results
     # (simulating Agent 1 and Agent 2 outputs)
     mock_csv_data = {
-        "option_type": {0: "call", 1: "put"},
-        "S": {0: 100.0, 1: 105.0},
-        "K": {0: 100.0, 1: 100.0},
-        "T": {0: 1.0, 1: 0.5},
-        "r": {0: 0.05, 1: 0.05},
-        "sigma": {0: 0.2, 1: 0.25}
+        "option_type": {0: "call", 1: "put", 2: "call", 3: "put"},
+        "S": {0: 100.0, 1: 100.0, 2: 105.0, 3: 105.0},
+        "K": {0: 100.0, 1: 100.0, 2: 100.0, 3: 100.0},
+        "T": {0: 1.0, 1: 1.0, 2: 0.5, 3: 0.5},
+        "r": {0: 0.05, 1: 0.05, 2: 0.05, 3: 0.05},
+        "sigma": {0: 0.2, 1: 0.2, 2: 0.25, 3: 0.25}
     }
 
     mock_calculation_results = """
-|   K |   S |   T | option_type   |    r |   sigma |   BSM_Price |
-|----:|----:|----:|:--------------|-----:|--------:|------------:|
-| 100 | 100 | 1   | call          | 0.05 |    0.2  |    10.4506  |
-| 100 | 100 | 1   | put           | 0.05 |    0.2  |     5.57353 |
-| 100 | 105 | 0.5 | call          | 0.05 |    0.25 |    11.4774  |
-| 100 | 105 | 0.5 | put           | 0.05 |    0.25 |     4.00839 |
-"""
+    |   K |   S |   T | option_type   |    r |   sigma |   BSM_Price |
+    |----:|----:|----:|:--------------|-----:|--------:|------------:|
+    | 100 | 100 | 1   | call          | 0.05 |    0.2  |    10.4506  |
+    | 100 | 100 | 1   | put           | 0.05 |    0.2  |     5.57353 |
+    | 100 | 105 | 0.5 | call          | 0.05 |    0.25 |    11.4774  |
+    | 100 | 105 | 0.5 | put           | 0.05 |    0.25 |     4.00839 |
+    """
 
     initial_state = {
         "messages": [],
@@ -176,68 +176,68 @@ def test_tester_agent():
             print(f"✗ Test 5 FAILED: {e}")
             assertions.append(("tests execution", False))
 
-        # Print test results details
-        print("\n" + "-"*60)
-        print("Test Results Details:")
-        print("-"*60)
-        test_results = result.get('test_results', {})
-        print(json.dumps(test_results, indent=2, default=str))
+        # # Print test results details
+        # print("\n" + "-"*60)
+        # print("Test Results Details:")
+        # print("-"*60)
+        # test_results = result.get('test_results', {})
+        # print(json.dumps(test_results, indent=2, default=str))
 
-        # Analyze test outcomes
-        print("\n" + "-"*60)
-        print("Test Outcomes Analysis:")
-        print("-"*60)
+        # # Analyze test outcomes
+        # print("\n" + "-"*60)
+        # print("Test Outcomes Analysis:")
+        # print("-"*60)
 
-        tests_run = test_results.get('tests_run', [])
-        if tests_run:
-            for test_info in tests_run:
-                test_name = test_info.get('test_name', 'Unknown')
-                test_result = test_info.get('result', {})
+        # tests_run = test_results.get('tests_run', [])
+        # if tests_run:
+        #     for test_info in tests_run:
+        #         test_name = test_info.get('test_name', 'Unknown')
+        #         test_result = test_info.get('result', {})
 
-                print(f"\nTool: {test_name}")
+        #         print(f"\nTool: {test_name}")
 
-                if isinstance(test_result, dict):
-                    status = test_result.get('status', 'unknown')
-                    tests_passed = test_result.get('tests_passed', 0)
-                    total_tests = test_result.get('tests_run', 0)
+        #         if isinstance(test_result, dict):
+        #             status = test_result.get('status', 'unknown')
+        #             tests_passed = test_result.get('tests_passed', 0)
+        #             total_tests = test_result.get('tests_run', 0)
 
-                    print(f"  Status: {status}")
-                    print(f"  Tests: {tests_passed}/{total_tests} passed")
+        #             print(f"  Status: {status}")
+        #             print(f"  Tests: {tests_passed}/{total_tests} passed")
 
-                    # Show details
-                    details = test_result.get('details', [])
-                    if details:
-                        print(f"  Details:")
-                        for detail in details:
-                            test_case = detail.get('test', 'Unknown test')
-                            test_status = detail.get('status', 'unknown')
-                            message = detail.get('message', '')
-                            status_icon = "✓" if test_status == "passed" else "✗"
-                            print(f"    {status_icon} {test_case}: {message}")
-        else:
-            print("No detailed test run information available")
-            overall = test_results.get('overall_status', 'unknown')
-            print(f"Overall status: {overall}")
+        #             # Show details
+        #             details = test_result.get('details', [])
+        #             if details:
+        #                 print(f"  Details:")
+        #                 for detail in details:
+        #                     test_case = detail.get('test', 'Unknown test')
+        #                     test_status = detail.get('status', 'unknown')
+        #                     message = detail.get('message', '')
+        #                     status_icon = "✓" if test_status == "passed" else "✗"
+        #                     print(f"    {status_icon} {test_case}: {message}")
+        # else:
+        #     print("No detailed test run information available")
+        #     overall = test_results.get('overall_status', 'unknown')
+        #     print(f"Overall status: {overall}")
 
-        # Final summary
-        print("\n" + "="*60)
-        print("Test Summary:")
-        print("="*60)
-        passed = sum(1 for _, status in assertions if status)
-        total = len(assertions)
-        print(f"Passed: {passed}/{total}")
+        # # Final summary
+        # print("\n" + "="*60)
+        # print("Test Summary:")
+        # print("="*60)
+        # passed = sum(1 for _, status in assertions if status)
+        # total = len(assertions)
+        # print(f"Passed: {passed}/{total}")
 
-        for test_name, status in assertions:
-            status_str = "✓ PASS" if status else "✗ FAIL"
-            print(f"  {status_str}: {test_name}")
+        # for test_name, status in assertions:
+        #     status_str = "✓ PASS" if status else "✗ FAIL"
+        #     print(f"  {status_str}: {test_name}")
 
-        # Overall result
-        if passed == total:
-            print("\n🎉 All tests PASSED!")
-            return True
-        else:
-            print(f"\n⚠️  {total - passed} test(s) FAILED")
-            return False
+        # # Overall result
+        # if passed == total:
+        #     print("\n🎉 All tests PASSED!")
+        #     return True
+        # else:
+        #     print(f"\n⚠️  {total - passed} test(s) FAILED")
+        #     return False
 
     except Exception as e:
         print(f"\n❌ Test execution error: {str(e)}")

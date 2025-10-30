@@ -26,6 +26,13 @@ class Tester:
                     "test_results": {"status": "skipped", "message": "No data to test"}
                 }
 
+            print("\n" + "="*60)
+            print("🔬 探针 1: Agent 构造消息前")
+            print("csv_data 类型:", type(csv_data))
+            print("csv_data 内容:", csv_data)
+            print("option_type 的第一个值:", csv_data.get("option_type", {}).get(0))
+            print("="*60 + "\n")
+
             task_message = HumanMessage(content=f"""
 Run comprehensive validation tests on ALL options loaded from CSV.
 
@@ -54,10 +61,32 @@ Each tool accepts the csv_data as input and processes all relevant options.
 Report the overall test status, number of options tested, and any validation failures found.
 """)
 
+            # 🔬 调试探针 2
+            print("\n" + "="*60)
+            print("🔬 探针 2: 消息内容（LLM 会看到什么）")
+            print(task_message.content[:500])  # 打印前 500 字符
+            print("="*60 + "\n")
+
+
             result = self.agent.invoke({
                 **state,
                 "messages": [task_message]
             })
+
+
+            # 🔬 调试探针 3
+            print("\n" + "="*60)
+            print("🔬 探针 3: Agent 返回的完整结果")
+            print("result 类型:", type(result))
+            print("result 键:", result.keys() if isinstance(result, dict) else "N/A")
+            if "messages" in result:
+                print("最后一条消息:")
+                last_msg = result["messages"][-1]
+                print("  类型:", type(last_msg))
+                print("  内容:", last_msg.content if hasattr(last_msg, 'content') else last_msg)
+                if hasattr(last_msg, 'tool_calls'):
+                    print("  工具调用:", last_msg.tool_calls)
+            print("="*60 + "\n")
 
             # Extract test results from tool messages
             test_results = {"tests_run": [], "overall_status": "unknown"}

@@ -130,13 +130,42 @@ def _validate_greeks_rules(greeks: Dict[str, Any], option_type: str) -> List[Dic
 
 def _parse_csv_data(csv_data: Union[str, Dict[str, Any]]) -> pd.DataFrame:
     """Parse CSV data into DataFrame."""
+
+    # 🔬 调试探针 4
+    print("\n" + "="*60)
+    print("🔬 探针 4: _parse_csv_data 接收的数据")
+    print("csv_data 类型:", type(csv_data))
+    print("csv_data 内容:", csv_data)
+    if isinstance(csv_data, dict) and 'option_type' in csv_data:
+        print("option_type 子结构:", csv_data['option_type'])
+        print("option_type 第一个值:", list(csv_data['option_type'].values())[0] if csv_data['option_type'] else "N/A")
+    print("="*60 + "\n")
+
+
     if isinstance(csv_data, str):
         data = json.loads(csv_data)
     elif isinstance(csv_data, dict):
         data = csv_data
     else:
         raise ValueError(f"csv_data must be string or dict, got {type(csv_data)}")
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+
+    # 🔬 调试探针 5
+    print("\n" + "="*60)
+    print("🔬 探针 5: DataFrame 创建后的结构")
+    print("DataFrame shape:", df.shape)
+    print("DataFrame columns:", df.columns.tolist())
+    print("DataFrame index:", df.index.tolist())
+    print("DataFrame dtypes:")
+    print(df.dtypes)
+    print("\nDataFrame 前几行:")
+    print(df.head())
+    print("\noption_type 列的值:", df['option_type'].tolist())
+    print("option_type 列的类型:", df['option_type'].dtype)
+    print("="*60 + "\n")
+
+
+    return df
 
 
 # ============================================================================
