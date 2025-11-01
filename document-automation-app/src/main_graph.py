@@ -92,3 +92,5 @@ if __name__ == "__main__":
     )
     result = app.invoke({"user_prompt": user_prompt})
     print("\nFinal Output:\n", result['report'])
+    with open("LangGraph_output.txt", "w") as file:
+        file.write(result['report'])
