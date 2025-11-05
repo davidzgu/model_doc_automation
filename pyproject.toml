@@ -1,6 +1,6 @@
 [project]
 name = "model-doc-automation"
-version = "0.1.0"
+version = "0.1.1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,5 +15,17 @@ dependencies = [
     "scipy>=1.16.2",
     "tabulate>=0.9.0",
 ]
+
+
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.uv]
+python-path = ["src"]
