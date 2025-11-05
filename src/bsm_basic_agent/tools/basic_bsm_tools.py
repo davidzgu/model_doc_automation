@@ -62,7 +62,7 @@ def bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sig
 
 
 
-@register_tool(tags=["bsm","price","batch"], roles=["calculator"])
+@register_tool(tags=["bsm","price","batch"], roles=["basic_bsm_agent"])
 @tool("calculate_bsm_price_batch")
 def batch_bsm_calculator(csv_data: Union[str, Dict[str, Any]]) -> Dict[str,str]:
     """

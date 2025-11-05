@@ -9,6 +9,7 @@ dependencies = [
     "langchain>=1.0.2",
     "langchain-core>=1.0.1",
     "langchain-ollama>=1.0.0",
+    "langgraph-checkpoint>=3.0.0",
     "numpy>=2.3.4",
     "pandas>=2.3.3",
     "pydantic>=2.12.3",
@@ -27,5 +28,3 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 
-[tool.uv]
-python-path = ["src"]

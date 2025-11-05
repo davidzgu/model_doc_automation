@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Callable, Iterable
-from langchain.tools.base import BaseTool
+from langchain_core.tools import BaseTool
 
 @dataclass
 class ToolMeta:
