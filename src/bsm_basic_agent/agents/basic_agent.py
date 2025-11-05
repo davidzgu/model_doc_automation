@@ -1,4 +1,17 @@
 # -*- coding: utf-8 -*-
+from dataclasses import dataclass
+from ..tools import get_tools_for_role
+
+
+@dataclass
+class BasicBSMAgent:
+    name: str = "basic_bsm_agent"
+
+    def __post_init__(self):
+        tools = get_tools_for_role("basic_bsm_agent")
+
+
+
 from langgraph.prebuilt import create_react_agent
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
