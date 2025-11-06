@@ -1,6 +1,7 @@
 from .basic_bsm_tools import (
     csv_loader,
-    bsm_calculator
+    bsm_calculator,
+    batch_bsm_calculator
 )
 
 from .tool_registry import REGISTRY

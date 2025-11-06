@@ -13,3 +13,10 @@ Future State:
   3) Run test (tool calling), automate testing script?
   Aggregation 
 
+
+
+uv sync 
+
+source .venv/bin/activate
+
+uv pip install -e . 
