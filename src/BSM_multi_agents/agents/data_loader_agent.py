@@ -1,63 +1,47 @@
-from langgraph.prebuilt import create_react_agent
-from langchain_core.messages import HumanMessage
+from pathlib import Path
 from typing import Dict, Any
 
-from src.agents.state import OptionAnalysisState
-from src.agents.tools.data_loader_tools import get_data_loader_tools
+from langchain_core.messages import HumanMessage
 
-class DataLoader:
-    """Agent 1: Load CSV data containing option parameters"""
+from bsm_multi_agents.agents.agent_factory import built_graph_agent_by_role
+from bsm_multi_agents.prompts.loader import load_prompt
+from bsm_multi_agents.graph.state import WorkflowState
+from bsm_multi_agents.agents.utils import merge_state_update_from_tool_messages
 
-    def __init__(self, llm):
-        self.agent = create_react_agent(
-            model=llm,
-            tools=get_data_loader_tools()
-        )
 
-    def __call__(self, state: OptionAnalysisState) -> Dict[str, Any]:
-        """Load CSV data"""
-        try:
-            csv_path = state["csv_file_path"]
+def data_loader_node(
+        state: WorkflowState,
+) -> Dict[str, Any]:
+    agent_role = 'data_loader'
+    agent = built_graph_agent_by_role(agent_role)
 
-            # Create task message
-            task_message = HumanMessage(content=f"""
-Load the option data from the CSV file at: {csv_path}
+    csv_path = state.get("csv_file_path")
+    if not csv_path:
+        csv_path = str(Path.cwd().parents[1] / "data" / "input" / "dummy_options.csv")
 
-Use the csv_loader tool to read the CSV file. Return the data in JSON format.
-""")
+    prompt_path = Path.cwd().parents[1] / "src" / "bsm_multi_agents" / "prompts" / "data_loader_prompts.txt"
+    prompt = load_prompt(prompt_path).format(csv_path=str(csv_path))
+    msg = HumanMessage(content=prompt)
 
-            # Invoke agent
-            result = self.agent.invoke({
-                **state,
-                "messages": [task_message]
-            })
+    result = agent.invoke(
+        {"messages": [msg]},
+        config={
+            "recursion_limit": 10,
+            "configurable": {"thread_id": "run-1"}
+        }
+    )
 
-            # Extract output from last message
-            if result.get("messages"):
-                # Look for tool messages with CSV data
-                for msg in reversed(result["messages"]):
-                    if hasattr(msg, 'name') and msg.name == 'csv_loader':
-                        import json
-                        try:
-                            csv_data = json.loads(msg.content)
-                            return {
-                                "csv_data": csv_data,
-                                "agent_status": "completed",
-                                "current_agent": "data_loader",
-                                "workflow_status": "in_progress"
-                            }
-                        except:
-                            pass
+    merged_messages = list(state.get("messages", []))
+    if isinstance(result, dict) and "messages" in result:
+        merged_messages.extend(result["messages"])
+    out = {"messages": merged_messages}
 
-            return {
-                "agent_status": "failed",
-                "current_agent": "data_loader",
-                "errors": ["Failed to load CSV data"]
-            }
+    merge_state_update_from_tool_messages(result, out, tool_names=("csv_loader",))
 
-        except Exception as e:
-            return {
-                "agent_status": "error",
-                "current_agent": "data_loader",
-                "errors": [f"Error: {str(e)}"]
-            }
+    return out
+
+
+
+
+
+

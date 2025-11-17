@@ -1,13 +1,10 @@
 from langchain.tools import tool
 import pandas as pd
 import json
-from typing import Union, Dict, Any
-import numpy as np
-from scipy.stats import norm
 from .tool_registry import register_tool
 
 @register_tool(tags=["io","csv"], roles=["data_loader"])
-@tool("read_csv_records")
+@tool("csv_loader")
 def csv_loader(filepath: str) -> str:
     """
     Reads a CSV file from the specified filepath and returns the first five rows in JSON format without the index. If an error occurs during reading,
@@ -22,6 +19,7 @@ def csv_loader(filepath: str) -> str:
 
     try:
         df = pd.read_csv(filepath)
-        return df.to_json(index=False)
+        rows = df.to_dict(orient="records")
+        return json.dumps({"state_update": {"csv_data": rows}})
     except Exception as e:
-        return f"Error reading CSV: {e}"
+        return json.dumps({"state_update": {"errors": [f"Error reading CSV: {e}"]}})

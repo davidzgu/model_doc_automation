@@ -10,39 +10,24 @@ from bsm_multi_agents.graph.state import WorkflowState
 from bsm_multi_agents.agents.utils import merge_state_update_from_tool_messages
 
 
-
-def chart_generator_node(
+def validator_node(
         state: WorkflowState,
 ) -> Dict[str, Any]:
-
-    if "bsm_results" not in state or not state["bsm_results"]:
-        return {
-            "messages": state.get("messages", []),
-            "errors": ["chart_generator_node: bsm_results is missing"],
-        }
-    
     if "greeks_results" not in state or not state["greeks_results"]:
         return {
             "messages": state.get("messages", []),
-            "errors": ["chart_generator_node: greeks_results is missing"],
+            "errors": ["validator_node: greeks_results is missing"],
         }
-
-    agent_role = "chart_generator"
+    
+    agent_role = "validator"
     default_system = """
-    You are a reporting agent specialized in generating summary charts.
+    You are a quantitative validator agent.
     """
-    agent = built_graph_agent_by_role(agent_role, default_system=default_system)
+    agent = built_graph_agent_by_role(agent_role,default_system=default_system)
 
-    bsm_results_str = json.dumps(state["bsm_results"], ensure_ascii=False)
-    greeks_results_str = json.dumps(state["greeks_results"], ensure_ascii=False)
-    output_dir = Path(__file__).resolve().parents[3] / "data" / "output"
-
-    prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "chart_generator_prompts.txt"
-    user_prompt = load_prompt(prompt_path).format(
-        bsm_results=bsm_results_str,
-        greeks_results=greeks_results_str,
-        output_dir=output_dir,
-    )
+    prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "validator_prompts.txt"
+    greeks_results_json = json.dumps(state["greeks_results"], ensure_ascii=False)
+    user_prompt = load_prompt(prompt_path).format(greeks_results=greeks_results_json)
 
     result = agent.invoke(
         {"messages": [HumanMessage(content=user_prompt)]},
@@ -57,7 +42,7 @@ def chart_generator_node(
     merge_state_update_from_tool_messages(
         result,
         out,
-        tool_names=("create_summary_charts",),
+        tool_names=("batch_greeks_validator",),
     )
 
     return out

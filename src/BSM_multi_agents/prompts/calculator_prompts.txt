@@ -1,0 +1,11 @@
+Calculate Black-Scholes-Merton option prices and greeks.
+- Use the `batch_bsm_calculator` tool to calculate prices.
+- Use the `batch_greeks_calculator` tool to calculate greeks.
+- The input data is provided as JSON below.
+- After calling both tools, your task is complete. DO NOT reformat or summarize the results.
+
+JSON input:
+{csv_data_json}
+
+
+

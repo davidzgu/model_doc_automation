@@ -1,0 +1,9 @@
+Generate visualization charts for the option analysis.
+
+Call the tool `create_summary_charts` with EXACTLY these arguments (do NOT wrap them in a JSON string):
+
+bsm_results = {bsm_results}
+greeks_results = {greeks_results}
+output_dir = {output_dir}
+
+Save them to {output_dir}.
