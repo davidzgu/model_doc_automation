@@ -31,7 +31,7 @@ def create_word_report(
     markdown_path: str,
     chart_paths: Union[str, List[str]],
     output_path: str = "output/report.docx",
-    title: str = "Option Portfolio Analysis Report"
+    title: str = "Ongoing Performance Analysis Report for Black-Scholes Option Pricing Model"
 ) -> str:
     """
     Create a professional Word document from markdown summary and charts.
