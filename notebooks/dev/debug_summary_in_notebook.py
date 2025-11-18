@@ -17,7 +17,7 @@ from bsm_multi_agents.graph.state import WorkflowState
 from bsm_multi_agents.agents.data_loader_agent import data_loader_node
 from bsm_multi_agents.agents.calculator_agent import calculator_node
 from bsm_multi_agents.agents.validator_agent import validator_node
-from bsm_multi_agents.agents.summary_generator import summary_generator_node
+from bsm_multi_agents.agents.summary_generator_agent import summary_generator_node
 
 # 1. 执行前面的节点获取数据
 csv_path = str(Path(__file__).parent / "data" / "input" / "dummy_options.csv")

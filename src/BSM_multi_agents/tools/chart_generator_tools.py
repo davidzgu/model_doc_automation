@@ -6,7 +6,7 @@ Creates plots for option prices, Greeks, and sensitivity analysis.
 """
 import json
 import os
-from typing import Union, Dict, Any
+from typing import Union, Dict, Any, List
 from pathlib import Path
 from langchain_core.tools import tool
 from .tool_registry import register_tool
@@ -24,12 +24,12 @@ except ImportError:
 
 @register_tool(tags=["chart","generate","price"], roles=["chart_generator"])
 @tool("create_option_price_chart")
-def create_option_price_chart(bsm_results: Union[str, Dict[str, Any]], output_dir: str = "outputs/charts") -> str:
+def create_option_price_chart(bsm_results: str, output_dir: str = "outputs/charts") -> str:
     """
     Create a chart showing option prices for different strike prices or spot prices.
 
     Args:
-        calculation_data: JSON string or dict with BSM calculation results
+        calculation_data: JSON string of list[dict] with BSM calculation results
         output_dir: Directory to save the chart
 
     Returns:
@@ -43,10 +43,7 @@ def create_option_price_chart(bsm_results: Union[str, Dict[str, Any]], output_di
 
     try:
         # Parse input
-        if isinstance(bsm_results, str):
-            data = json.loads(bsm_results)
-        else:
-            data = bsm_results
+        data = json.loads(bsm_results)
         # Create output directory
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -111,7 +108,7 @@ def create_option_price_chart(bsm_results: Union[str, Dict[str, Any]], output_di
 
 @register_tool(tags=["chart","generate","greeks"], roles=["chart_generator"])
 @tool("create_greeks_chart")
-def create_greeks_chart(greeks_results: Union[str, Dict[str, Any]], output_dir: str = "outputs/charts") -> str:
+def create_greeks_chart(greeks_results: str, output_dir: str = "outputs/charts") -> str:
     """
     Create portfolio Greeks distribution analysis charts (Bank OPA style).
 
@@ -124,7 +121,7 @@ def create_greeks_chart(greeks_results: Union[str, Dict[str, Any]], output_dir: 
     6. Theta & Rho Summary
 
     Args:
-        greeks_data: JSON string or dict with Greeks calculation results
+        greeks_data: JSON string of list[dict] with Greeks calculation results
                     Expected fields: option_type, S, K, delta, gamma, vega, theta, rho, T, price
         output_dir: Directory to save the chart
 
@@ -140,10 +137,7 @@ def create_greeks_chart(greeks_results: Union[str, Dict[str, Any]], output_dir: 
 
     try:
         # Parse input
-        if isinstance(greeks_results, str):
-            data = json.loads(greeks_results)
-        else:
-            data = greeks_results
+        data = json.loads(greeks_results)
 
         # Create output directory
         output_path = Path(output_dir)
@@ -347,25 +341,24 @@ def create_greeks_chart(greeks_results: Union[str, Dict[str, Any]], output_dir: 
 
 @register_tool(tags=["chart","generate","summary"], roles=["chart_generator"])
 @tool("create_summary_charts")
-def create_summary_charts(bsm_results: Union[str, Dict[str, Any]], greeks_results: Union[str, Dict[str, Any]], output_dir: str = "outputs/charts") -> str:
+def create_summary_charts(
+    bsm_results: str,
+    greeks_results: str,
+    output_dir: str = "outputs/charts"
+) -> str:
     """
     Create a comprehensive set of charts including prices and Greeks.
 
     Args:
-        bsm_results: JSON string or dict with BSM calculation results
-        greeks_results: JSON string or dict with Greeks calculation results
-        output_dir: Directory to save charts
+        bsm_results: JSON string of list[dict] with BSM calculation results
+        greeks_results: JSON string of list[dict] with Greeks calculation results
+        output_dir: Directory in str to save charts
 
     Returns:
         JSON string with list of chart paths and descriptions
     """
     try:
-        # Ensure data is in string format for .invoke()
-        if not isinstance(bsm_results, str):
-            bsm_results = json.dumps(bsm_results)
-        if not isinstance(greeks_results, str):
-            greeks_results = json.dumps(greeks_results)
-
+        # bsm_results and greeks_results are already JSON strings, use them directly
         charts = []
 
         # Create price chart
