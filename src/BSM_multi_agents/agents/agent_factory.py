@@ -43,7 +43,14 @@ def built_graph_agent_by_role(
     default_system: str = DEFAULTSYSTEM
 ):
     tools = get_tools_for_role(agent_role)
-    print(agent_role, [t.name for t in tools])
     llm = get_llm()
+
+    # Display agent configuration
+    llm_model = getattr(llm, 'model_name', None) or getattr(llm, 'model', 'unknown')
+    llm_provider = llm.__class__.__name__
+    tool_names = [t.name for t in tools]
+
+    print(f"[{agent_role}] LLM: {llm_provider} ({llm_model}), Tools: {tool_names}")
+
     agent = built_graph_agent(llm, tools, default_system=default_system)
     return agent
