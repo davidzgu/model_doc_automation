@@ -24,14 +24,19 @@ def router(state: WorkflowState) -> Literal[
 ]:
     # If a node has explicitly set next_agent, prioritize that
     if state.get("next_agent"):
-        return state["next_agent"]  # type: ignore[return-value]
+        next_node = state["next_agent"]
+        print(f"[Router] next_agent explicitly set to: {next_node}")
+        return next_node  # type: ignore[return-value]
 
     # Sequential workflow logic based on state completeness
     if "csv_data" not in state:
+        print("[Router] csv_data missing → routing to data_loader")
         return "data_loader"
     if "bsm_results" not in state or "greeks_results" not in state:
+        print(f"[Router] bsm_results or greeks_results missing → routing to calculator")
         return "calculator"
     if "validate_results" not in state:
+        print("[Router] validate_results missing → routing to validator")
         return "validator"
 
     # After validator, we need both summary_generator and chart_generator
@@ -41,15 +46,19 @@ def router(state: WorkflowState) -> Literal[
 
     # If neither summary nor charts exist, prioritize summary_generator
     if not has_summary:
+        print("[Router] report_md missing → routing to summary_generator")
         return "summary_generator"
     if not has_charts:
+        print("[Router] chart_results missing → routing to chart_generator")
         return "chart_generator"
 
     # If both summary and charts exist, check if we need report_generator
     if "report_path" not in state:
+        print("[Router] report_path missing → routing to report_generator")
         return "report_generator"
 
     # Everything is complete
+    print("[Router] All stages complete → routing to END")
     return "end"
 
 
