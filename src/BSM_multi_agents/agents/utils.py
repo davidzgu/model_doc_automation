@@ -2,6 +2,8 @@ import json
 import re
 from typing import Dict, Any, Iterable
 
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+
 def merge_state_update_from_tool_messages(
     result: Dict[str, Any],
     out: Dict[str, Any],
@@ -72,3 +74,41 @@ def merge_state_update_from_AI_messages(
                     out[key] = value
             # 找到第一个有效的 JSON 就停止
             break
+
+def print_resp(resp):
+    step_num = 1
+    for message in resp["messages"]:
+        if isinstance(message, HumanMessage):
+            print(f"Step {step_num} - inputs:")
+            print(f"   {message.content[:200]}..." if len(message.content) > 200 else f"   {message.content}")
+            print()
+            step_num += 1
+
+        elif isinstance(message, AIMessage):
+            if hasattr(message, 'tool_calls') and message.tool_calls:
+                # Agent 决定调用工具
+                print(f"Step {step_num} - Agent decide tools used:")
+                for tool_call in message.tool_calls:
+                    print(f"   Tool name: {tool_call['name']}")
+                    print(f"   Tool parameters: {tool_call['args']}")
+                print()
+                step_num += 1
+            elif message.content:
+                print(f"Step {step_num} - Agent outputs:")
+                print(f"   {message.content}")
+                print()
+                step_num += 1
+
+        elif isinstance(message, ToolMessage):
+            print(f"Step {step_num} - outputs:")
+            print(f"   Tool name: {message.name}")
+            # result_preview = message.content[:300] + "..." if len(message.content) > 300 else message.content
+            result_preview = message.content
+            print(f"   Outputs: {result_preview}")
+            print()
+            step_num += 1
+
+    print(f"\n{'='*80}")
+    print(f"Final outputs:")
+    print(f"{'='*80}\n")
+    print(resp["messages"][-1].content)

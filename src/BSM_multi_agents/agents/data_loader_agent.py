@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage
 from bsm_multi_agents.agents.agent_factory import built_graph_agent_by_role
 from bsm_multi_agents.prompts.loader import load_prompt
 from bsm_multi_agents.graph.state import WorkflowState
-from bsm_multi_agents.agents.utils import merge_state_update_from_tool_messages
+from bsm_multi_agents.agents.utils import merge_state_update_from_tool_messages,print_resp
 
 
 def data_loader_node(
@@ -17,9 +17,9 @@ def data_loader_node(
 
     csv_path = state.get("csv_file_path")
     if not csv_path:
-        csv_path = str(Path.cwd().parents[1] / "data" / "input" / "dummy_options.csv")
+        csv_path = str(Path(__file__).resolve().parents[3] / "data" / "input" / "dummy_options.csv")
 
-    prompt_path = Path.cwd().parents[1] / "src" / "bsm_multi_agents" / "prompts" / "data_loader_prompts.txt"
+    prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "data_loader_prompts.txt"
     prompt = load_prompt(prompt_path).format(csv_path=str(csv_path))
     msg = HumanMessage(content=prompt)
 
@@ -41,6 +41,17 @@ def data_loader_node(
     return out
 
 
+########
+
+
+def main():
+    csv_path = str(Path(__file__).resolve().parents[3] / "data" / "input" / "dummy_options.csv")
+    state = WorkflowState(csv_file_path=csv_path)
+    out = data_loader_node(state)
+    print_resp(out)
+
+if __name__ == "__main__":
+    main()
 
 
 
