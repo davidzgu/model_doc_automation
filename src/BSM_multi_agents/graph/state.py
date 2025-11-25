@@ -1,8 +1,10 @@
 from __future__ import annotations
+import operator
 from typing import TypedDict, List, Dict, Any, Literal, Annotated, Sequence
 from langchain_core.messages import AnyMessage, BaseMessage
 from langgraph.graph.message import add_messages
-from src.bsm_multi_agents.tools.utils import JSON_STR
+
+from bsm_multi_agents.tools.utils import JSON_STR
 
 
 class WorkflowState(TypedDict, total=False):
@@ -22,5 +24,5 @@ class WorkflowState(TypedDict, total=False):
 
     # # Workflow control
     # next_agent: Literal["data_loader", "calculator", "end"]
-    # errors: List[str]
+    errors: Annotated[List[str], operator.add]
 

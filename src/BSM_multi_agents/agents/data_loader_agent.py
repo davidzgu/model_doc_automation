@@ -6,18 +6,18 @@ from langchain_core.messages import HumanMessage
 from bsm_multi_agents.agents.agent_factory import built_graph_agent_by_role
 from bsm_multi_agents.prompts.loader import load_prompt
 from bsm_multi_agents.graph.state import WorkflowState
-from bsm_multi_agents.agents.utils import merge_state_update_from_tool_messages,print_resp
+from bsm_multi_agents.agents.utils import get_tool_result_from_messages,print_resp
 
 
 def data_loader_node(
         state: WorkflowState,
-) -> Dict[str, Any]:
+) -> WorkflowState:
     agent_role = 'data_loader'
     agent = built_graph_agent_by_role(agent_role)
 
     csv_path = state.get("csv_file_path")
     if not csv_path:
-        csv_path = str(Path(__file__).resolve().parents[3] / "data" / "input" / "dummy_options.csv")
+        return {"messages": "No csv file path provided"}
 
     prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "data_loader_prompts.txt"
     prompt = load_prompt(prompt_path).format(csv_path=str(csv_path))
@@ -31,14 +31,18 @@ def data_loader_node(
         }
     )
 
-    merged_messages = list(state.get("messages", []))
-    if isinstance(result, dict) and "messages" in result:
-        merged_messages.extend(result["messages"])
-    out = {"messages": merged_messages}
+    csv_data = get_tool_result_from_messages(result["messages"], "csv_loader")
+    if "Error" in csv_data:
+        return {
+            "messages": result["messages"],
+            "errors": csv_data["Error"]
+        }
+    else:
+        return {
+            "messages": result["messages"],
+            "csv_data": csv_data["result"]
+        }
 
-    merge_state_update_from_tool_messages(result, out, tool_names=("csv_loader",))
-
-    return out
 
 
 ########
