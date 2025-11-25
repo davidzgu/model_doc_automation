@@ -10,10 +10,7 @@ from .tool_registry import register_tool
 from .utils import load_json_as_df
 
 
-
-@register_tool(tags=["bsm","price"], roles=["calculator"])
-@tool("bsm_calculator")
-def bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
+def _bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> float:
     """
     Calculates the Black-Scholes price for European call or put options.
 
@@ -40,7 +37,7 @@ def bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sig
     else:
         raise ValueError("option_type must be 'call' or 'put'")
 
-    return str(option_price)
+    return option_price
 
 @register_tool(tags=["bsm","price","batch"], roles=["calculator"])
 @tool("batch_bsm_calculator")
@@ -57,41 +54,35 @@ def batch_bsm_calculator(csv_data: Union[str, Dict[str, Any], List[Dict[str, Any
     try:
         df = load_json_as_df(csv_data)
         if df is False:
-            return json.dumps({"state_update": {"errors": [f"csv_data must be a string, dict, or list, got {type(csv_data)}"]}})
-        
-            
-
-        
+            return json.dumps({"errors": [f"csv_data must be a string, dict, or list, got {type(csv_data)}"]})
 
         required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
-            return json.dumps({"state_update": {"errors": [f"Missing required columns: {missing_cols}"]}})
+            return {"errors": [f"Missing required columns: {missing_cols}"]}
 
         def calc_row(row):
-            return bsm_calculator.invoke(
-                {
-                    "option_type": row['option_type'], 
-                    "S": row['S'], 
-                    "K": row['K'], 
-                    "T": row['T'], 
-                    "r": row['r'], 
-                    "sigma": row['sigma'], 
-                }
+            return _bsm_calculator(
+                row['option_type'], 
+                row['S'], 
+                row['K'], 
+                row['T'], 
+                row['r'], 
+                row['sigma']
             )
         df['BSM_Price'] = df.apply(
             calc_row, axis=1
         )
-        payload = json.loads(df.to_json(orient="records"))
-        return json.dumps({"state_update": {"bsm_results": payload}})
+        result = {"bsm_results": df.to_json(orient='records', date_format='iso')}
+        return json.dumps(result)
 
     except Exception as e:
-        return json.dumps({"state_update": {"errors": [f"batch_bsm_calculator error: {e}"]}})
+        return json.dumps({"errors": [f"batch_bsm_calculator error: {e}"]})
 
 
-@register_tool(tags=["greeks"], roles=["calculator"])
-@tool("greeks_calculator")
-def greeks_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
+# @register_tool(tags=["greeks"], roles=["calculator"])
+# @tool("greeks_calculator")
+def _greeks_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
     """
     Calculates option Greeks for a European call or put using the Black-Scholes model.
 
@@ -110,7 +101,7 @@ def greeks_calculator(option_type: str, S: float, K: float, T: float, r: float, 
         option_type = option_type.lower()
 
         if T <= 0 or sigma <= 0:
-            return json.dumps({"error": "T and sigma must be positive"})
+            raise ValueError("T and sigma must be positive")
 
         d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
@@ -130,7 +121,7 @@ def greeks_calculator(option_type: str, S: float, K: float, T: float, r: float, 
             rho = float(-K * T * np.exp(-r * T) * norm.cdf(-d2))
             theta = float((-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T)) + r * K * np.exp(-r * T) * norm.cdf(-d2)))
         else:
-            return json.dumps({"error": "option_type must be 'call' or 'put'"})
+            raise ValueError("option_type must be 'call' or 'put'")
 
         results = {
             "price": float(price),
@@ -141,9 +132,9 @@ def greeks_calculator(option_type: str, S: float, K: float, T: float, r: float, 
             "theta": theta,
         }
 
-        return json.dumps(results)
+        return results
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise ValueError(str(e))
 
 @register_tool(tags=["greeks","batch"], roles=["calculator"])
 @tool("batch_greeks_calculator")
@@ -160,29 +151,23 @@ def batch_greeks_calculator(csv_data: Union[str, Dict[str, Any], List[Dict[str, 
     try:
         df = load_json_as_df(csv_data)
         if df is False:
-            return json.dumps({"state_update": {"errors": [f"csv_data must be a string, dict, or list, got {type(csv_data)}"]}})
+            return json.dumps({"errors": [f"csv_data must be a string, dict, or list, got {type(csv_data)}"]})
         
         required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
-            return json.dumps({"state_update": {"errors": [f"Missing required columns: {missing_cols}"]}})
+            return json.dumps({"errors": [f"Missing required columns: {missing_cols}"]})
         
         def calc_row(row):
-            res = greeks_calculator.invoke(
-                {
-                    "option_type": row['option_type'], 
-                    "S": row['S'], 
-                    "K": row['K'], 
-                    "T": row['T'], 
-                    "r": row['r'], 
-                    "sigma": row['sigma'], 
-                }
+            res = _greeks_calculator(
+                row['option_type'], 
+                row['S'], 
+                row['K'], 
+                row['T'], 
+                row['r'], 
+                row['sigma'], 
             )
-            try:
-                d = json.loads(res)             # res 是 JSON 字符串 → 解析成 dict
-            except Exception as e:
-                d = {"error": f"invalid JSON from greeks_calculator: {e}"}
-            return d
+            return res
         
         expanded = df.apply(calc_row, axis=1).apply(pd.Series)
         result_cols = ['price','delta','gamma','vega','rho','theta']
@@ -190,12 +175,11 @@ def batch_greeks_calculator(csv_data: Union[str, Dict[str, Any], List[Dict[str, 
             if col not in expanded:
                 expanded[col] = pd.NA
         df = pd.concat([df, expanded[result_cols]], axis=1)
-
-        payload = json.loads(df.to_json(orient="records"))
-        return json.dumps({"state_update": {"greeks_results": payload}})
+        result = {"greeks_results": df.to_json(orient='records', date_format='iso')}
+        return json.dumps(result)
         
     except Exception as e:
-        return json.dumps({"state_update": {"errors": [f"batch_greeks_calculator error: {e}"]}})
+        return json.dumps({"errors": [f"batch_greeks_calculator error: {e}"]})
 
 
 @register_tool(tags=["sensitivity"], roles=["calculator"])

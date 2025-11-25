@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Dict, Any
+import json
 
 from langchain_core.messages import HumanMessage
 
@@ -40,7 +41,7 @@ def data_loader_node(
     else:
         return {
             "messages": result["messages"],
-            "csv_data": csv_data["result"]
+            "csv_data": json.loads(csv_data["result"])['csv_data']
         }
 
 

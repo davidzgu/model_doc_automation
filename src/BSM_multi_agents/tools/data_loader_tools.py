@@ -19,7 +19,8 @@ def csv_loader(filepath: str) -> str:
 
     try:
         df = pd.read_csv(filepath)
-        json_str = df.to_json(orient='records')
-        return json_str
+        json_str = df.to_json(orient='records', date_format='iso')
+        result = {"csv_data": json_str}
+        return json.dumps(result)
     except Exception as e:
         return json.dumps({"errors": [f"Error reading CSV: {e}"]})
