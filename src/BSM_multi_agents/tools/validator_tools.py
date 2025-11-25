@@ -1,16 +1,17 @@
-from typing import Union, Dict, Any, List
+from typing import Union, Dict, Any, List, Annotated
 import json
 import pandas as pd
 
 from langchain.tools import tool
+from langgraph.prebuilt import InjectedState
 
 from .tool_registry import register_tool
 from .utils import load_json_as_df
 
 
-@register_tool(tags=["greeks","validate"], roles=["validator"])
-@tool("validate_greeks_rules")
-def validate_greeks_rules(
+# @register_tool(tags=["greeks","validate"], roles=["validator"])
+# @tool("validate_greeks_rules")
+def _validate_greeks_rules(
         option_type: str,
         price: float, 
         delta: float, 
@@ -73,11 +74,13 @@ def validate_greeks_rules(
         "validations_result": validations_result,
         "validations_details": validations_details
     }
-    return json.dumps(results)
+    return results
 
 @register_tool(tags=["greeks","validate","batch"], roles=["validator"])
 @tool("batch_greeks_validator")
-def batch_greeks_validator(csv_data: Union[str, Dict[str, Any], List[Dict[str, Any]]]) -> str:
+def batch_greeks_validator(
+    state: Annotated[dict, InjectedState]
+) -> str:
     """
     Validate Greeks for ALL options from CSV data.
 
@@ -87,37 +90,32 @@ def batch_greeks_validator(csv_data: Union[str, Dict[str, Any], List[Dict[str, A
     - Validates: gamma >= 0, vega >= 0
 
     Args:
-        csv_data: JSON string, dict, or list of dicts with columns: option_type, price, delta, gamma, vega
+        state: InjectedState, state from the workflow, which contains csv_data
+
 
     Returns:
-        JSON string with state_update containing validate_results
+        JSON string containing validate_results
     """
     try:
-        df = load_json_as_df(csv_data)
-        if df is False:
-            return json.dumps({"state_update": {"errors": [f"csv_data must be a string, dict, or list, got {type(csv_data)}"]}})
+        greeks_result = state.get("greeks_results")
+        if greeks_result is None:    
+            return json.dumps({"errors": [f"greeks_result is missing. State keys: {list(state.keys())}"]})
         
-
+        df = load_json_as_df(greeks_result)
         required_cols = ['option_type', 'price', 'delta', 'gamma', 'vega']
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
-            return json.dumps({"status": "error", "message": f"Missing columns: {missing}"})
+            return json.dumps({"errors": [f"Missing columns: {missing}"]})
 
         def calc_row(row):
-            res = validate_greeks_rules.invoke(
-                {
-                    "option_type": row['option_type'], 
-                    "price": row['price'], 
-                    "delta": row['delta'], 
-                    "gamma": row['gamma'], 
-                    "vega": row['vega'], 
-                }
+            res = _validate_greeks_rules(
+                row['option_type'], 
+                row['price'], 
+                row['delta'], 
+                row['gamma'], 
+                row['vega'], 
             )
-            try:
-                d = json.loads(res)             # res 是 JSON 字符串 → 解析成 dict
-            except Exception as e:
-                d = {"error": f"invalid JSON from greeks_calculator: {e}"}
-            return d
+            return res
         
         expanded = df.apply(calc_row, axis=1).apply(pd.Series)
         result_cols = ['validations_result','validations_details']
@@ -125,10 +123,9 @@ def batch_greeks_validator(csv_data: Union[str, Dict[str, Any], List[Dict[str, A
             if col not in expanded:
                 expanded[col] = pd.NA
         df = pd.concat([df, expanded[result_cols]], axis=1)
-
-        payload = json.loads(df.to_json(orient="records"))
-        return json.dumps({"state_update": {"validate_results": payload}})
+        result = {"validate_results": df.to_json(orient='records', date_format='iso')}
+        return json.dumps(result)
 
     except Exception as e:
-        return json.dumps({"status": "error", "message": f"Error: {str(e)}"})
+        return json.dumps({"errors": [f"Error: {str(e)}"]})
 

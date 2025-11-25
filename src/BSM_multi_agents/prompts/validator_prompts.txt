@@ -1,7 +1,3 @@
 Run comprehensive validation tests on ALL options
 - Use the `batch_greeks_validator` tool to validate greeks.
-- The input data is provided as JSON below.
-- After calling tools, your task is complete. DO NOT reformat or summarize the results.
-
-JSON input:
-{greeks_results}
+- The data has been loaded into the state.

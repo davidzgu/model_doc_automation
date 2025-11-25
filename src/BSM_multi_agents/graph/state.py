@@ -15,9 +15,9 @@ class WorkflowState(TypedDict, total=False):
     # Business data
     csv_file_path: str
     csv_data: JSON_STR
-    bsm_results: List[Dict[str, Any]]
-    greeks_results: List[Dict[str, Any]]
-    # validate_results: List[Dict[str, Any]]
+    bsm_results: JSON_STR
+    greeks_results: JSON_STR
+    validate_results: JSON_STR
     # report_md: List[Dict[str, Any]]
     # chart_results: List[Dict[str, Any]]
     # report_path: str

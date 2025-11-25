@@ -7,7 +7,7 @@ from langchain_core.messages import HumanMessage
 from bsm_multi_agents.agents.agent_factory import built_graph_agent_by_role
 from bsm_multi_agents.prompts.loader import load_prompt
 from bsm_multi_agents.graph.state import WorkflowState
-from bsm_multi_agents.agents.utils import merge_state_update_from_tool_messages
+from bsm_multi_agents.agents.utils import get_tool_result_from_messages
 
 
 def validator_node(
@@ -26,23 +26,24 @@ def validator_node(
     agent = built_graph_agent_by_role(agent_role,default_system=default_system)
 
     prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "validator_prompts.txt"
-    greeks_results_json = json.dumps(state["greeks_results"], ensure_ascii=False)
-    user_prompt = load_prompt(prompt_path).format(greeks_results=greeks_results_json)
+    user_prompt = load_prompt(prompt_path)
 
+    agent_input = state.copy()
+    agent_input["messages"] = [HumanMessage(content=user_prompt)]
+    agent_input["remaining_steps"] = 10
     result = agent.invoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
+        agent_input,
         config={"recursion_limit": 10, "configurable": {"thread_id": state.get("thread_id","run-1")}}
     )
 
-    merged_messages = list(state.get("messages", []))
-    if isinstance(result, dict) and "messages" in result:
-        merged_messages.extend(result["messages"])
-    out = {"messages": merged_messages}
-
-    merge_state_update_from_tool_messages(
-        result,
-        out,
-        tool_names=("batch_greeks_validator",),
-    )
-
-    return out
+    validate_results = get_tool_result_from_messages(result["messages"], "batch_greeks_validator")
+    if "Error" in validate_results:
+        return {
+            "messages": result["messages"],
+            "errors": validate_results["Error"]
+        }
+    else:
+        return {
+            "messages": result["messages"],
+            "validate_results": json.loads(validate_results["result"])['validate_results'],
+        }

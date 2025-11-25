@@ -6,7 +6,7 @@ from .bsm_calculator_tools import (
     batch_greeks_calculator,
 )
 from .validator_tools import (
-    validate_greeks_rules,
+    # validate_greeks_rules,
     batch_greeks_validator
 )
 from .summary_generator_tools import generate_summary
