@@ -24,8 +24,12 @@ def data_loader_node(
     prompt = load_prompt(prompt_path).format(csv_path=str(csv_path))
     msg = HumanMessage(content=prompt)
 
+    agent_input = {
+        "messages": [msg],
+        "remaining_steps": 10
+    }
     result = agent.invoke(
-        {"messages": [msg]},
+        agent_input,
         config={
             "recursion_limit": 10,
             "configurable": {"thread_id": "run-1"}

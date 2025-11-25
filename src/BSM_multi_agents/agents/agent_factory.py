@@ -5,10 +5,11 @@ from pathlib import Path
 from bsm_basic_agent.prompts.loader import load_prompt
 from bsm_multi_agents.tools import get_tools_for_role
 from bsm_multi_agents.config.llm_config import get_llm
+from bsm_multi_agents.graph.state import WorkflowState
 
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.checkpoint.memory import MemorySaver
-# from langgraph.prebuilt import create_react_agent
+from langgraph.prebuilt import create_react_agent
 from langchain.agents import create_agent
 
 
@@ -28,12 +29,13 @@ def built_graph_agent(
         source=prompt,
         default_system=default_system
     )
-    checkpointer = MemorySaver() if with_memory else None
-    agent = create_agent(
+    # checkpointer = MemorySaver() if with_memory else None
+    agent = create_react_agent(
         llm,
         list(tools),
-        system_prompt=chat_prompt,
-        checkpointer = checkpointer
+        state_schema=WorkflowState,   
+        prompt=chat_prompt,
+        # checkpointer = checkpointer,
     )
     return agent
 

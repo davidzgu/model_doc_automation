@@ -1,10 +1,14 @@
 import numpy as np
 from scipy.stats import norm
-from typing import Union, Dict, Any, List
+from typing import Union, Dict, Any, List, Annotated
 import json
 import pandas as pd
 
+
+
+
 from langchain.tools import tool
+from langgraph.prebuilt import InjectedState
 
 from .tool_registry import register_tool
 from .utils import load_json_as_df
@@ -41,17 +45,26 @@ def _bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, si
 
 @register_tool(tags=["bsm","price","batch"], roles=["calculator"])
 @tool("batch_bsm_calculator")
-def batch_bsm_calculator(csv_data: Union[str, Dict[str, Any], List[Dict[str, Any]]]) -> str:
+def batch_bsm_calculator(
+    state: Annotated[dict, InjectedState]
+) -> str:
     """
     Batch calculates Black-Scholes option prices for multiple options from CSV data.
+    The data is automatically retrieved from the workflow state.
 
     Args:
-        csv_data: JSON string, dict, or list of dicts with columns: option_type, S, K, T, r, sigma
+        state: InjectedState, state from the workflow, which contains csv_data
 
     Returns:
-        str: JSON string with state_update containing bsm_results
+        str: JSON string with bsm_results
     """
     try:
+        # Debug print
+        # print(f"DEBUG: state keys: {state.keys()}")
+        csv_data = state.get("csv_data")
+        if csv_data is None:
+            return json.dumps({"errors": [f"csv_data is missing. State keys: {list(state.keys())}"]})
+        
         df = load_json_as_df(csv_data)
         if df is False:
             return json.dumps({"errors": [f"csv_data must be a string, dict, or list, got {type(csv_data)}"]})
@@ -80,8 +93,6 @@ def batch_bsm_calculator(csv_data: Union[str, Dict[str, Any], List[Dict[str, Any
         return json.dumps({"errors": [f"batch_bsm_calculator error: {e}"]})
 
 
-# @register_tool(tags=["greeks"], roles=["calculator"])
-# @tool("greeks_calculator")
 def _greeks_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> str:
     """
     Calculates option Greeks for a European call or put using the Black-Scholes model.
@@ -138,17 +149,24 @@ def _greeks_calculator(option_type: str, S: float, K: float, T: float, r: float,
 
 @register_tool(tags=["greeks","batch"], roles=["calculator"])
 @tool("batch_greeks_calculator")
-def batch_greeks_calculator(csv_data: Union[str, Dict[str, Any], List[Dict[str, Any]]]) -> str:
+def batch_greeks_calculator(
+    state: Annotated[dict, InjectedState]
+) -> str:
     """
     Batch calculates greeks for multiple options from CSV data.
+    The data is automatically retrieved from the workflow state.
 
     Args:
-        csv_data: JSON string, dict, or list of dicts with columns: option_type, S, K, T, r, sigma
+        state: InjectedState, state from the workflow, which contains csv_data
 
     Returns:
         str: JSON string with state_update containing greeks_results
     """
     try:
+        csv_data = state.get("csv_data")
+        if csv_data is None:
+            return json.dumps({"errors": ["csv_data is missing"]})
+        
         df = load_json_as_df(csv_data)
         if df is False:
             return json.dumps({"errors": [f"csv_data must be a string, dict, or list, got {type(csv_data)}"]})
