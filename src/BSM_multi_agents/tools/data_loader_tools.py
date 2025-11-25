@@ -7,19 +7,19 @@ from .tool_registry import register_tool
 @tool("csv_loader")
 def csv_loader(filepath: str) -> str:
     """
-    Reads a CSV file from the specified filepath and returns the first five rows in JSON format without the index. If an error occurs during reading,
+    Reads a CSV file from the specified filepath and returns in JSON format without the index. If an error occurs during reading,
     returns an error message.
 
     Args:
         filepath (str): The path to the CSV file to be read.
 
     Returns:
-        str: JSON string of the first five rows of the CSV file, or an error message.
+        str: JSON string of the CSV file, or an error message.
     """
 
     try:
         df = pd.read_csv(filepath)
-        rows = df.to_dict(orient="records")
-        return json.dumps({"state_update": {"csv_data": rows}})
+        json_str = df.to_json(orient='records')
+        return json_str
     except Exception as e:
-        return json.dumps({"state_update": {"errors": [f"Error reading CSV: {e}"]}})
+        return json.dumps({"errors": [f"Error reading CSV: {e}"]})

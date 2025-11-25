@@ -866,13 +866,14 @@ wheels = [
 [[package]]
 name = "model-doc-automation"
 version = "0.1.1"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "ipykernel" },
     { name = "langchain" },
     { name = "langchain-core" },
     { name = "langchain-ollama" },
+    { name = "langgraph" },
     { name = "langgraph-checkpoint" },
     { name = "markdown" },
     { name = "matplotlib" },
@@ -891,6 +892,7 @@ requires-dist = [
     { name = "langchain", specifier = ">=1.0.2" },
     { name = "langchain-core", specifier = ">=1.0.1" },
     { name = "langchain-ollama", specifier = ">=1.0.0" },
+    { name = "langgraph", specifier = ">=0.2.0" },
     { name = "langgraph-checkpoint", specifier = ">=3.0.0" },
     { name = "markdown", specifier = ">=3.10" },
     { name = "matplotlib", specifier = ">=3.10.7" },

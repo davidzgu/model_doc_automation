@@ -1,7 +1,8 @@
 import json
 import pandas as pd
+from typing import List, Dict, Any
 
-
+JSON_STR = List[Dict[str, Any]]
 
 def load_json_as_df(csv_data):
     if isinstance(csv_data, str):
