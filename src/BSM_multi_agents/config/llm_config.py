@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 DEFAULT_PROVIDER = "ollama"
 
 # Ollama settings
-DEFAULT_OLLAMA_MODEL = "qwen2.5:7b"
+DEFAULT_OLLAMA_MODEL = "qwen3:8b"
 
 # OpenAI settings
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
