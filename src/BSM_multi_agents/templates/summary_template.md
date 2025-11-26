@@ -1,136 +1,45 @@
-# OPTIONS PRICING ANALYSIS (OPA)
-## Black-Scholes-Merton Model Validation Report
+# 📊 BSM Model Ongoing Performance Analysis
 
----
+**Date:** {analysis_date} | **Total Options:** {total_options} | **Status:** {validation_status}
 
-**Report Date:** {analysis_date}
-**Analysis Period:** {analysis_period}
-**Total Instruments Analyzed:** {total_options}
-**Validation Status:** {validation_status}
+## 1. Executive Summary
 
----
+| Metric | Value |
+| :--- | :--- |
+| **Total Processed** | {total_options} |
+| **Pass Rate** | {pass_rate}% |
+| **Failed** | {failed_count} |
+| **Option Types** | {option_types_inline} |
 
-## EXECUTIVE SUMMARY
+## 2. Market Data Overview
 
-### Validation Overview
-- **Total Options Processed:** {total_options}
-- **Validation Pass Rate:** {pass_rate}%
-- **Failed Validations:** {failed_count}
-- **Option Types Distribution:**
-{option_types}
+| Metric | Range | Average |
+| :--- | :--- | :--- |
+| **Spot Price (S)** | {spot_range} | {spot_avg} |
+| **Strike Price (K)** | {strike_range} | {strike_avg} |
+| **Maturity (T)** | {maturity_range} | {maturity_avg} |
+| **Volatility (σ)** | {volatility_range} | {volatility_avg} |
 
-### Key Metrics
-{key_metrics}
+## 3. Pricing & Greeks Analysis
 
----
-
-## MARKET DATA SNAPSHOT
-
-### Underlying Asset Statistics
-{underlying_stats}
-
-### Strike Price Distribution
-{strike_distribution}
-
-### Time to Maturity Profile
-{maturity_profile}
-
----
-
-## PRICING ANALYSIS
-
-### Black-Scholes-Merton Results
+### BSM Pricing
 {bsm_pricing_summary}
 
-### Greeks Summary
-{greeks_summary}
+### Greeks Profile
+| Greek | Average | Range | Expected |
+| :--- | :--- | :--- | :--- |
+| **Delta** | {delta_avg} | {delta_range} | [-1, 1] |
+| **Gamma** | {gamma_avg} | {gamma_range} | ≥ 0 |
+| **Vega** | {vega_avg} | {vega_range} | ≥ 0 |
+| **Theta** | {theta_avg} | {theta_range} | ≤ 0 |
+| **Rho** | {rho_avg} | {rho_range} | Varies |
 
----
-
-## VALIDATION RESULTS
-
-### Overall Validation Status
-- **Total Validations:** {total_options}
-- **Passed:** {passed_count} ({pass_rate}%)
-- **Failed:** {failed_count} ({fail_rate}%)
-
-### Validation Details by Category
-{validation_details}
-
-### Critical Issues Identified
+## 4. Validation Details
+**Critical Issues:**
 {critical_issues}
 
----
-
-## RISK METRICS ANALYSIS
-
-### Delta Exposure
-{delta_analysis}
-
-### Gamma Profile
-{gamma_analysis}
-
-### Vega Sensitivity
-{vega_analysis}
-
-### Theta Decay
-{theta_analysis}
-
-### Rho Interest Rate Risk
-{rho_analysis}
-
----
-
-## DETAILED FINDINGS
-
-### Options Performance Summary
-{performance_summary}
-
-### Anomalies and Outliers
-{anomalies}
-
-### Model Accuracy Assessment
-{model_accuracy}
-
----
-
-## RECOMMENDATIONS
-
+## 5. Recommendations
 {recommendations}
 
 ---
-
-## APPENDIX
-
-### Methodology
-This analysis employs the Black-Scholes-Merton (BSM) pricing model for European-style options. The model assumes:
-- Constant volatility (σ)
-- Log-normal distribution of underlying asset returns
-- No dividends during option life
-- Constant risk-free rate (r)
-- Frictionless markets
-
-### Greeks Definitions
-- **Delta (Δ):** Rate of change of option price with respect to underlying asset price
-- **Gamma (Γ):** Rate of change of delta with respect to underlying asset price
-- **Vega (ν):** Sensitivity to volatility changes
-- **Theta (Θ):** Time decay of option value
-- **Rho (ρ):** Sensitivity to interest rate changes
-
-### Validation Criteria
-Options are validated against the following rules:
-1. Delta bounds: Call [0,1], Put [-1,0]
-2. Gamma bounds: [0, ∞)
-3. Vega bounds: [0, ∞)
-4. Price consistency checks
-5. Put-Call parity (where applicable)
-
----
-
-**Disclaimer:** This report is generated for analytical purposes only. It does not constitute investment advice or recommendations. All pricing models are subject to assumptions and limitations. Users should conduct independent verification before making investment decisions.
-
----
-
-*Report Generated: {timestamp}*
-*System: AI-Powered Options Analytics Platform*
-*Model Version: BSM v1.0*
+*Generated at {timestamp}*

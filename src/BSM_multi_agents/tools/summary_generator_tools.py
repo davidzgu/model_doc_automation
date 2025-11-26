@@ -1,364 +1,244 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union, Dict, Any, List
+from typing import Optional, Dict, Any, Tuple, List, Annotated
 
 import pandas as pd
 from langchain.tools import tool
+from langgraph.prebuilt import InjectedState
 
 from .tool_registry import register_tool
-from .utils import load_json_as_df  # 你已有
+from .utils import load_json_as_df
 
 
-def _load_template_text(template_path: Optional[str]) -> Optional[str]:
-    """
-    If template_path provided and exists, use it.
-    Else try default: src/templates/summary_template.md
-    """
-    path = None
+def _load_template(template_path: Optional[str]) -> str:
+    """Load template from path or default location."""
     if template_path:
         p = Path(template_path)
-        path = p if p.exists() else None
-    if path is None:
-        default = Path(__file__).resolve().parents[1] / "templates" / "summary_template.md"
-        path = default if default.exists() else None
-    return path.read_text(encoding="utf-8") if path else None
+        if p.exists():
+            return p.read_text(encoding="utf-8")
+    
+    # Default path
+    default_path = Path(__file__).resolve().parents[1] / "templates" / "summary_template.md"
+    if default_path.exists():
+        return default_path.read_text(encoding="utf-8")
+    
+    raise FileNotFoundError("Summary template not found.")
 
 
-def _generate_greeks_summary(vr_df: pd.DataFrame) -> str:
-    """生成 Greeks 摘要"""
-    lines = []
-    greek_cols = ['delta', 'gamma', 'vega', 'theta', 'rho']
+def _parse_input_data(state: dict) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Extract and convert input data from state to DataFrames."""
+    bsm_df = load_json_as_df(state.get("bsm_results"))
+    greeks_df = load_json_as_df(state.get("greeks_results"))
+    vr_df = load_json_as_df(state.get("validate_results"))
 
-    for col in greek_cols:
-        if col in vr_df.columns:
-            try:
-                col_numeric = pd.to_numeric(vr_df[col], errors='coerce')
-                lines.append(f"- **{col.capitalize()}:** Avg = {col_numeric.mean():.6f}, Range = [{col_numeric.min():.6f}, {col_numeric.max():.6f}]")
-            except Exception:
-                pass
+    if bsm_df is False: bsm_df = pd.DataFrame()
+    if greeks_df is False: greeks_df = pd.DataFrame()
+    if vr_df is False: vr_df = pd.DataFrame()
 
-    return "\n".join(lines) if lines else "- Greeks data not available"
+    return bsm_df, greeks_df, vr_df
 
 
-def _generate_greek_analysis(vr_df: pd.DataFrame, col_name: str, display_name: str, expected_range: str) -> str:
-    """生成单个 Greek 的详细分析"""
-    if col_name not in vr_df.columns:
-        return f"- **{display_name}** data not available in validation results"
+def _format_range(series: pd.Series, fmt: str = "{:.2f}") -> str:
+    """Helper to format min-max range."""
+    if series.empty:
+        return "N/A"
+    try:
+        vals = pd.to_numeric(series, errors='coerce').dropna()
+        if vals.empty:
+            return "N/A"
+        return f"[{fmt.format(vals.min())}, {fmt.format(vals.max())}]"
+    except:
+        return "N/A"
+
+
+def _format_avg(series: pd.Series, fmt: str = "{:.2f}") -> str:
+    """Helper to format average."""
+    if series.empty:
+        return "N/A"
+    try:
+        vals = pd.to_numeric(series, errors='coerce').dropna()
+        if vals.empty:
+            return "N/A"
+        return fmt.format(vals.mean())
+    except:
+        return "N/A"
+
+
+def _compute_market_stats(vr_df: pd.DataFrame) -> Dict[str, str]:
+    """Compute statistics for market data (S, K, T, sigma)."""
+    stats = {}
+    
+    # Spot Price
+    s_series = vr_df.get('S', pd.Series())
+    stats['spot_range'] = _format_range(s_series)
+    stats['spot_avg'] = _format_avg(s_series)
+
+    # Strike Price
+    k_series = vr_df.get('K', pd.Series())
+    stats['strike_range'] = _format_range(k_series)
+    stats['strike_avg'] = _format_avg(k_series)
+
+    # Maturity
+    t_series = vr_df.get('T', pd.Series())
+    stats['maturity_range'] = _format_range(t_series)
+    stats['maturity_avg'] = _format_avg(t_series)
+
+    # Volatility
+    sigma_series = vr_df.get('sigma', pd.Series())
+    stats['volatility_range'] = _format_range(sigma_series, "{:.2%}")
+    stats['volatility_avg'] = _format_avg(sigma_series, "{:.2%}")
+
+    return stats
+
+
+def _compute_greek_stats(vr_df: pd.DataFrame) -> Dict[str, str]:
+    """Compute statistics for Greeks."""
+    stats = {}
+    for greek in ['delta', 'gamma', 'vega', 'theta', 'rho']:
+        series = vr_df.get(greek, pd.Series())
+        stats[f'{greek}_range'] = _format_range(series, "{:.4f}")
+        stats[f'{greek}_avg'] = _format_avg(series, "{:.4f}")
+    return stats
+
+
+def _compute_bsm_stats(bsm_df: pd.DataFrame) -> str:
+    """Generate summary string for BSM pricing."""
+    if bsm_df.empty or "BSM_Price" not in bsm_df.columns:
+        return "No BSM pricing data available."
 
     try:
-        col_numeric = pd.to_numeric(vr_df[col_name], errors='coerce')
-
-        analysis = f"- **Portfolio {display_name}:** {col_numeric.sum():.6f}\n"
-        analysis += f"- **Average {display_name}:** {col_numeric.mean():.6f}\n"
-        analysis += f"- **{display_name} Range:** [{col_numeric.min():.6f}, {col_numeric.max():.6f}]\n"
-        analysis += f"- **Expected Range:** {expected_range}\n"
-        analysis += f"- **Standard Deviation:** {col_numeric.std():.6f}"
-
-        return analysis
+        prices = pd.to_numeric(bsm_df['BSM_Price'], errors='coerce').dropna()
+        if prices.empty:
+            return "No valid BSM prices found."
+            
+        return (
+            f"- **Total Priced:** {len(prices)}\n"
+            f"- **Avg Price:** ${prices.mean():.4f}\n"
+            f"- **Range:** [${prices.min():.4f}, ${prices.max():.4f}]\n"
+            f"- **Total Value:** ${prices.sum():.2f}"
+        )
     except Exception:
-        return f"- Unable to compute {display_name} statistics"
+        return "Error calculating BSM stats."
 
 
-def _generate_recommendations(fail_cnt: Optional[int], total: int, vr_df: pd.DataFrame) -> str:
-    """生成建议"""
-    recommendations = []
-
+def _generate_recommendations(fail_cnt: int, vr_df: pd.DataFrame) -> str:
+    """Generate recommendations based on failures and data checks."""
+    recs = []
+    
     if fail_cnt == 0:
-        recommendations.append("✅ **All validations passed.** The portfolio demonstrates consistent pricing and Greeks within expected theoretical bounds.")
+        recs.append("✅ **System Healthy:** All validations passed.")
     else:
-        recommendations.append(f"⚠️ **{fail_cnt} validation failures detected.** Review failed options for potential pricing discrepancies or input data errors.")
+        recs.append(f"⚠️ **Action Required:** Investigate {fail_cnt} failed options.")
 
-    # 检查波动率
-    if 'sigma' in vr_df.columns:
-        try:
-            sigma_numeric = pd.to_numeric(vr_df['sigma'], errors='coerce')
-            if sigma_numeric.max() > 1.0:  # 100% volatility
-                recommendations.append("⚠️ **High volatility detected** (>100%). Consider reviewing volatility inputs for accuracy.")
-        except Exception:
-            pass
+    # Check specific conditions
+    try:
+        if 'sigma' in vr_df.columns:
+            max_vol = pd.to_numeric(vr_df['sigma'], errors='coerce').max()
+            if max_vol > 1.0:
+                recs.append("- **High Volatility:** Detected >100% volatility. Verify input data.")
+        
+        if 'T' in vr_df.columns:
+            min_t = pd.to_numeric(vr_df['T'], errors='coerce').min()
+            if min_t < 0.1:
+                recs.append("- **Near Expiry:** Short-dated options (T < 0.1y) detected. Monitor Theta.")
+    except:
+        pass
 
-    # 检查到期时间
-    if 'T' in vr_df.columns:
-        try:
-            T_numeric = pd.to_numeric(vr_df['T'], errors='coerce')
-            if T_numeric.min() < 0.1:  # Less than 1.2 months
-                recommendations.append("📌 **Short-dated options detected** (T < 0.1 years). Monitor Theta decay closely.")
-        except Exception:
-            pass
-
-    # 检查 Gamma 风险
-    if 'gamma' in vr_df.columns:
-        try:
-            gamma_numeric = pd.to_numeric(vr_df['gamma'], errors='coerce')
-            if gamma_numeric.max() > 0.1:
-                recommendations.append("📌 **High Gamma exposure detected.** Portfolio may be sensitive to large moves in underlying asset.")
-        except Exception:
-            pass
-
-    if not recommendations:
-        recommendations.append("✅ No specific recommendations at this time. Continue monitoring market conditions.")
-
-    return "\n".join(recommendations)
-
-def _generate_fallback_summary_md(
-    total: int,
-    passed: Optional[int],
-    failed: Optional[int],
-    option_type_counts: Optional[Dict[str, int]],
-    key_issues_md: str,
-    bsm_df: Optional[pd.DataFrame],
-    greeks_df: Optional[pd.DataFrame],
-) -> str:
-    lines = []
-    lines.append(f"# Validation Summary")
-    lines.append("")
-    lines.append(f"- Date: {datetime.now().strftime('%Y-%m-%d')}")
-    lines.append(f"- Total options: {total}")
-    lines.append(f"- Passed: {passed if passed is not None else 'N/A'}")
-    lines.append(f"- Failed: {failed if failed is not None else 'N/A'}")
-    lines.append("")
-    lines.append("## Option Types")
-    if option_type_counts:
-        for k, v in option_type_counts.items():
-            lines.append(f"- {k}: {v}")
-    else:
-        lines.append("- N/A")
-    lines.append("")
-    lines.append("## Key Issues")
-    lines.append(key_issues_md or "- None")
-    lines.append("")
-
-    # 计算简要统计
-    calc_lines = []
-    if bsm_df is not None and bsm_df is not False and "BSM_Price" in bsm_df.columns:
-        try:
-            bsm_price_numeric = pd.to_numeric(bsm_df['BSM_Price'], errors='coerce')
-            calc_lines.append(f"- Avg BSM Price: {bsm_price_numeric.mean():.4f}")
-        except Exception:
-            pass
-    if greeks_df is not None and greeks_df is not False:
-        for col in ["delta","gamma","vega","rho","theta"]:
-            if col in greeks_df.columns:
-                try:
-                    col_numeric = pd.to_numeric(greeks_df[col], errors='coerce')
-                    calc_lines.append(f"- Avg {col.capitalize()}: {col_numeric.mean():.6f}")
-                except Exception:
-                    pass
-    if calc_lines:
-        lines.append("## Calculation Stats")
-        lines += calc_lines
-        lines.append("")
-
-    lines.append(f"_Generated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_")
-    return "\n".join(lines)
+    return "\n".join(recs)
 
 
-@register_tool(tags=["summary","generate"], roles=["summary_generator"])
+@register_tool(tags=["summary", "generate"], roles=["summary_generator"])
 @tool("generate_summary")
 def generate_summary(
-    validate_results: Union[str, List[Dict[str, Any]], Dict[str, Any]],
-    bsm_results: Optional[Union[str, List[Dict[str, Any]]]] = None,
-    greeks_results: Optional[Union[str, List[Dict[str, Any]]]] = None,
+    state: Annotated[dict, InjectedState],
     template_path: Optional[str] = None,
     save_md: bool = True,
 ) -> str:
     """
-    Generate a Markdown summary based on validator results (and optionally calculation results).
-    If a template is provided (or found at default path), fill it; otherwise compose a fallback summary.
-    Returns JSON envelope: {"state_update": {"report_md": "...", "report_path": "...?"}}
+    Generate a concise Markdown summary report for BSM model performance.
+    
+    Args:
+        state: Injected state containing bsm_results, greeks_results, validate_results.
+        template_path: Optional path to custom template.
+        save_md: Whether to save the report to disk.
+        
+    Returns:
+        JSON string with state_update containing report_md and optional report_path.
     """
     try:
-        vr_df = load_json_as_df(validate_results)
-        if vr_df is False:
-            return json.dumps({"state_update": {"errors": ["validator_results must be JSON string, dict or list"]}})
+        # 1. Load Data
+        bsm_df, greeks_df, vr_df = _parse_input_data(state)
+        if bsm_df.empty:
+            return json.dumps({"errors": ["No BSM results found to summarize."]})
+        if greeks_df.empty:
+            return json.dumps({"errors": ["No Greeks results found to summarize."]})
+        if vr_df.empty:
+            return json.dumps({"errors": ["No validation results found to summarize."]})
 
-        bsm_df = load_json_as_df(bsm_results) if bsm_results is not None else None
-        greeks_df = load_json_as_df(greeks_results) if greeks_results is not None else None
-
+        # 2. Calculate General Stats
         total = len(vr_df)
-        pass_cnt  = int((vr_df.get("validations_result") == "passed").sum()) if "validations_result" in vr_df else None
-        fail_cnt  = int((vr_df.get("validations_result") == "failed").sum()) if "validations_result" in vr_df else None
-
-        option_type_counts = None
+        pass_cnt = int((vr_df.get("validations_result") == "passed").sum()) if "validations_result" in vr_df else 0
+        fail_cnt = total - pass_cnt
+        pass_rate = f"{(pass_cnt / total * 100):.1f}" if total > 0 else "0.0"
+        
+        # Option Types
+        option_types_inline = "N/A"
         if "option_type" in vr_df.columns:
-            option_type_counts = vr_df["option_type"].value_counts(dropna=False).to_dict()
+            counts = vr_df["option_type"].value_counts().to_dict()
+            option_types_inline = ", ".join([f"{k}: {v}" for k, v in counts.items()])
 
-        key_issues_md = ""
+        # Critical Issues
+        issues = []
         if "validations_details" in vr_df.columns:
-            issues = []
-            for x in vr_df["validations_details"].tolist():
-                if isinstance(x, list):
-                    issues.extend([str(i) for i in x if i])
-            if issues:
-                key_issues_md = "\n".join(f"- {i}" for i in issues[:50])  # 防止过长
-    except Exception as e:
-        return json.dumps({"state_update": {"errors": [f"summary parse error: {e}"]}})
-    
+            raw_issues = vr_df[vr_df["validations_result"] == "failed"]["validations_details"].tolist()
+            for item in raw_issues:
+                if isinstance(item, list):
+                    issues.extend([str(i) for i in item if i])
+                elif item:
+                    issues.append(str(item))
+        
+        critical_issues = "\n".join([f"- {i}" for i in issues[:10]]) if issues else "None"
+        if len(issues) > 10:
+            critical_issues += f"\n- ... and {len(issues) - 10} more."
 
-    template_txt = _load_template_text(template_path)
+        # 3. Prepare Template Variables
+        market_stats = _compute_market_stats(vr_df)
+        greek_stats = _compute_greek_stats(vr_df)
+        
+        context = {
+            "analysis_date": datetime.now().strftime("%Y-%m-%d"),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "total_options": total,
+            "validation_status": "✅ PASSED" if fail_cnt == 0 else "⚠️ ISSUES FOUND",
+            "pass_rate": pass_rate,
+            "failed_count": fail_cnt,
+            "option_types_inline": option_types_inline,
+            "bsm_pricing_summary": _compute_bsm_stats(bsm_df),
+            "critical_issues": critical_issues,
+            "recommendations": _generate_recommendations(fail_cnt, vr_df),
+            **market_stats,
+            **greek_stats
+        }
 
+        # 4. Render Template
+        template_txt = _load_template(template_path)
+        report_md = template_txt.format(**context)
 
-    if template_txt:
-        try:
-            # === 基础信息 ===
-            analysis_date = datetime.now().strftime("%Y-%m-%d")
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # 计算通过率
-            pass_rate = f"{(pass_cnt / total * 100):.1f}" if total > 0 and pass_cnt is not None else "0.0"
-            fail_rate = f"{(fail_cnt / total * 100):.1f}" if total > 0 and fail_cnt is not None else "0.0"
-
-            # 验证状态
-            validation_status = "✅ PASSED" if fail_cnt == 0 else f"⚠️ {fail_cnt} ISSUES FOUND"
-
-            # === 期权类型分布 ===
-            option_types_md = ""
-            if option_type_counts:
-                option_types_md = "\n".join(f"  - **{k.capitalize()}:** {v} positions" for k, v in option_type_counts.items())
-            else:
-                option_types_md = "  - N/A"
-
-            # === 关键指标 ===
-            key_metrics = f"- **Average Option Price:** {pd.to_numeric(vr_df.get('price', [0]), errors='coerce').mean():.4f}\n"
-            key_metrics += f"- **Price Range:** [{pd.to_numeric(vr_df.get('price', [0]), errors='coerce').min():.4f}, {pd.to_numeric(vr_df.get('price', [0]), errors='coerce').max():.4f}]"
-
-            # === 标的资产统计 ===
-            underlying_stats = ""
-            if 'S' in vr_df.columns:
-                S_numeric = pd.to_numeric(vr_df['S'], errors='coerce')
-                underlying_stats = f"- **Spot Price Range:** [{S_numeric.min():.2f}, {S_numeric.max():.2f}]\n"
-                underlying_stats += f"- **Average Spot:** {S_numeric.mean():.2f}\n"
-                underlying_stats += f"- **Volatility (σ) Range:** [{pd.to_numeric(vr_df.get('sigma', [0]), errors='coerce').min():.2%}, {pd.to_numeric(vr_df.get('sigma', [0]), errors='coerce').max():.2%}]"
-            else:
-                underlying_stats = "- Data not available"
-
-            # === 行权价分布 ===
-            strike_distribution = ""
-            if 'K' in vr_df.columns:
-                K_numeric = pd.to_numeric(vr_df['K'], errors='coerce')
-                strike_distribution = f"- **Strike Range:** [{K_numeric.min():.2f}, {K_numeric.max():.2f}]\n"
-                strike_distribution += f"- **Average Strike:** {K_numeric.mean():.2f}"
-            else:
-                strike_distribution = "- Data not available"
-
-            # === 到期时间分布 ===
-            maturity_profile = ""
-            if 'T' in vr_df.columns:
-                T_numeric = pd.to_numeric(vr_df['T'], errors='coerce')
-                maturity_profile = f"- **Time to Maturity Range:** [{T_numeric.min():.2f}, {T_numeric.max():.2f}] years\n"
-                maturity_profile += f"- **Average Maturity:** {T_numeric.mean():.2f} years"
-            else:
-                maturity_profile = "- Data not available"
-
-            # === BSM 定价摘要 ===
-            bsm_pricing_summary = "- No BSM pricing data available"
-            if bsm_df is not None and bsm_df is not False and "BSM_Price" in bsm_df.columns:
-                try:
-                    bsm_price_numeric = pd.to_numeric(bsm_df['BSM_Price'], errors='coerce')
-                    bsm_pricing_summary = f"- **Total Options Priced:** {len(bsm_df)}\n"
-                    bsm_pricing_summary += f"- **Average BSM Price:** ${bsm_price_numeric.mean():.4f}\n"
-                    bsm_pricing_summary += f"- **Price Range:** [${bsm_price_numeric.min():.4f}, ${bsm_price_numeric.max():.4f}]\n"
-                    bsm_pricing_summary += f"- **Total Portfolio Value:** ${bsm_price_numeric.sum():.2f}"
-                except Exception:
-                    pass
-
-            # === Greeks 摘要 ===
-            greeks_summary = _generate_greeks_summary(vr_df)
-
-            # === 验证细节 ===
-            validation_details = f"**All validations passed criteria:** {pass_cnt}/{total} options"
-
-            # === 关键问题 ===
-            critical_issues = key_issues_md if key_issues_md else "✅ No critical issues identified. All options passed validation checks."
-
-            # === Greeks 分析（详细） ===
-            delta_analysis = _generate_greek_analysis(vr_df, 'delta', 'Delta', '[-1, 1]')
-            gamma_analysis = _generate_greek_analysis(vr_df, 'gamma', 'Gamma', '[0, ∞)')
-            vega_analysis = _generate_greek_analysis(vr_df, 'vega', 'Vega', '[0, ∞)')
-            theta_analysis = _generate_greek_analysis(vr_df, 'theta', 'Theta', '(-∞, 0]')
-            rho_analysis = _generate_greek_analysis(vr_df, 'rho', 'Rho', 'Varies')
-
-            # === 性能摘要 ===
-            performance_summary = f"Analysis completed successfully for {total} options with {pass_rate}% validation pass rate."
-
-            # === 异常值 ===
-            anomalies = "No significant anomalies detected in the current dataset."
-
-            # === 模型准确性 ===
-            model_accuracy = "BSM model assumptions hold for the analyzed dataset. All Greeks within expected theoretical bounds."
-
-            # === 建议 ===
-            recommendations = _generate_recommendations(fail_cnt, total, vr_df)
-
-            # === 分析周期 ===
-            if 'date' in vr_df.columns:
-                dates = pd.to_datetime(vr_df['date'], errors='coerce')
-                analysis_period = f"{dates.min().strftime('%Y-%m-%d')} to {dates.max().strftime('%Y-%m-%d')}"
-            else:
-                analysis_period = analysis_date
-
-            summary = template_txt.format(
-                analysis_date=analysis_date,
-                analysis_period=analysis_period,
-                total_options=total,
-                validation_status=validation_status,
-                pass_rate=pass_rate,
-                failed_count=fail_cnt if fail_cnt is not None else 0,
-                option_types=option_types_md,
-                key_metrics=key_metrics,
-                underlying_stats=underlying_stats,
-                strike_distribution=strike_distribution,
-                maturity_profile=maturity_profile,
-                bsm_pricing_summary=bsm_pricing_summary,
-                greeks_summary=greeks_summary,
-                passed_count=pass_cnt if pass_cnt is not None else 0,
-                fail_rate=fail_rate,
-                validation_details=validation_details,
-                critical_issues=critical_issues,
-                delta_analysis=delta_analysis,
-                gamma_analysis=gamma_analysis,
-                vega_analysis=vega_analysis,
-                theta_analysis=theta_analysis,
-                rho_analysis=rho_analysis,
-                performance_summary=performance_summary,
-                anomalies=anomalies,
-                model_accuracy=model_accuracy,
-                recommendations=recommendations,
-                timestamp=timestamp,
-            )
-        except Exception as e:
-            return json.dumps({"state_update": {"errors": [f"template render error: {e}"]}})
-    else:
-        # 兜底 Markdown（没有模板时）
-        summary = _generate_fallback_summary_md(
-            total=total,
-            passed=pass_cnt,
-            failed=fail_cnt,
-            option_type_counts=option_type_counts,
-            key_issues_md=key_issues_md,
-            bsm_df=bsm_df,
-            greeks_df=greeks_df,
-        )
-
-
-    report_path = None
-    if save_md:
-        try:
+        # 5. Save Report
+        report_path = None
+        if save_md:
             out_dir = Path(__file__).resolve().parents[3] / "data" / "output"
             out_dir.mkdir(parents=True, exist_ok=True)
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            p = out_dir / f"validation_summary_{ts}.md"
-            p.write_text(summary, encoding="utf-8")
+            filename = f"validation_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+            p = out_dir / filename
+            p.write_text(report_md, encoding="utf-8")
             report_path = str(p)
-        except Exception as e:
-            out_dir = Path(__file__).resolve().parents[3] / "data" / "output"
-            report_path = None
-            json.dumps({"state_update": {"errors": [f"Path {out_dir} doesn't exits."]}})
 
-    return json.dumps({"state_update": {
-        "report_md": summary,
-        **({"report_path": report_path} if report_path else {})
-    }})
+        return json.dumps({
+                "report_md": report_md,
+                "report_path": report_path
+            })
 
-            
+    except Exception as e:
+        return json.dumps({"errors": [f"Summary generation failed: {str(e)}"]})

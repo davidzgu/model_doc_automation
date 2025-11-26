@@ -18,9 +18,9 @@ class WorkflowState(TypedDict, total=False):
     bsm_results: JSON_STR
     greeks_results: JSON_STR
     validate_results: JSON_STR
-    # report_md: List[Dict[str, Any]]
+    report_md: JSON_STR
+    report_path: str
     # chart_results: List[Dict[str, Any]]
-    # report_path: str
 
     # # Workflow control
     # next_agent: Literal["data_loader", "calculator", "end"]
