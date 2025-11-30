@@ -7,7 +7,7 @@ from langchain_core.messages import HumanMessage
 from bsm_multi_agents.agents.agent_factory import built_graph_agent_by_role
 from bsm_multi_agents.prompts.loader import load_prompt
 from bsm_multi_agents.graph.state import WorkflowState
-from bsm_multi_agents.agents.utils import get_tool_result_from_messages
+from bsm_multi_agents.agents.utils import create_mcp_tool_wrapper
 
 
 def calculator_node(
