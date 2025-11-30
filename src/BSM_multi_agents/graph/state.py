@@ -9,21 +9,18 @@ from bsm_multi_agents.tools.utils import JSON_STR
 
 class WorkflowState(TypedDict, total=False):
     # Conversation messages (for agents to read/append)
-    # messages: List[AnyMessage]
     messages: Annotated[Sequence[BaseMessage], add_messages]
 
     # Business data
     csv_file_path: str
-    csv_data: JSON_STR
-    bsm_results: JSON_STR
-    greeks_results: JSON_STR
-    validate_results: JSON_STR
-    report_md: JSON_STR
+    bsm_results_path: str
+    greeks_results_path: str
+    validate_results_path: str
+    report_md_path: str
+    report_charts_path: str
     report_path: str
-    # chart_results: List[Dict[str, Any]]
 
-    # # Workflow control
-    # next_agent: Literal["data_loader", "calculator", "end"]
+    # Workflow control
     errors: Annotated[List[str], operator.add]
     remaining_steps: Annotated[int, operator.add]
 
