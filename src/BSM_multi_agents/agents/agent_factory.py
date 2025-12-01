@@ -23,11 +23,11 @@ def built_graph_agent(
     *,
     prompt: Union[str, Path, None] = None,
     with_memory: bool = True,
-    default_system: str = DEFAULTSYSTEM
+    system_prompt: str = DEFAULTSYSTEM
 ):
     chat_prompt:str = load_prompt(
         source=prompt,
-        default_system=default_system
+        default_system=system_prompt
     )
     # checkpointer = MemorySaver() if with_memory else None
     agent = create_react_agent(
@@ -42,7 +42,7 @@ def built_graph_agent(
 
 def built_graph_agent_by_role(
     agent_role: str,
-    default_system: str = DEFAULTSYSTEM
+    system_prompt: str = DEFAULTSYSTEM
 ):
     tools = get_tools_for_role(agent_role)
     llm = get_llm()
@@ -54,5 +54,5 @@ def built_graph_agent_by_role(
 
     print(f"[{agent_role}] LLM: {llm_provider} ({llm_model}), Tools: {tool_names}")
 
-    agent = built_graph_agent(llm, tools, default_system=default_system)
+    agent = built_graph_agent(llm, tools, system_prompt=system_prompt)
     return agent

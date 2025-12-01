@@ -117,7 +117,6 @@ def _greeks_calculator(option_type: str, S: float, K: float, T: float, r: float,
     except Exception as e:
         raise ValueError(str(e))
 
-
 def calculate_greeks_to_file(input_path: str, output_dir: str = "./output") -> str:
     """
     Reads the CSV at input_path, calculates greeks, and saves the result to output_dir.

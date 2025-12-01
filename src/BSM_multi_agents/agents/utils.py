@@ -1,65 +1,74 @@
-import json
-import re
 from typing import Dict, Any, Iterable
 import asyncio
 
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from mcp.client import ClientSession, StdioServerParameters
 
-def create_mcp_tool_wrapper(tool_name: str, server_script_path: str, input_arg_map: Dict[str, str], output_key: str):
-    """
-    创建一个同步的 LangChain Tool，内部调用异步的 MCP Client。
-    
-    Args:
-        tool_name: MCP Server 上的工具名称 (e.g., "calculate_bsm_to_file")
-        server_script_path: MCP Server 脚本的绝对路径
-        input_arg_map: 映射 State 中的 key 到 MCP 工具的参数名 (e.g., {"csv_file_path": "input_path"})
-        output_key: 将 MCP 工具返回的结果保存到 State 的哪个 key (e.g., "bsm_results_path")
-    """
-    async def _run_mcp_tool(kwargs):
-        # 启动 MCP Server 进程
-        server_params = StdioServerParameters(
-            command="python", 
-            args=[server_script_path]
-        )
-        async with ClientSession(server_params) as session:
-            await session.initialize()
-            # 调用工具
-            return await session.call_tool(tool_name, arguments=kwargs)
 
-    def wrapper(state: dict):
-        # 1. 准备参数：从 State 中提取数据
-        tool_args = {}
-        for state_key, tool_arg_name in input_arg_map.items():
-            if state_key not in state:
-                return f"Error: Missing required state key '{state_key}'"
-            tool_args[tool_arg_name] = state.get(state_key)
-            
-        # 2. 调用 MCP 工具 (同步运行异步代码)
-        try:
-            result_path = asyncio.run(_run_mcp_tool(tool_args))
-            
-            # 3. 处理结果：检查是否出错
-            if isinstance(result_path, str) and result_path.startswith("Error"):
-                return {"errors": [result_path]}
-            
-            # 4. 更新 State：保存返回的路径
-            return {output_key: result_path}
-            
-        except Exception as e:
-            return {"errors": [f"MCP Tool execution failed: {str(e)}"]}
 
-    return wrapper
+# def create_mcp_state_tool_wrapper(
+#     *,  # 推荐用 keyword-only，避免顺序错
+#     mcp_tool_name: str,
+#     server_script_path: str,
+#     input_arg_map: Dict[str, str],
+#     output_key: str,
+# ):
+#     """
+#     返回一个函数： state -> state_update
 
-# def get_tool_result_from_messages(messages, tool_name):
-#     for msg in reversed(messages):
-#         if isinstance(msg, ToolMessage) and msg.name == tool_name:
-#             try:
-#                 return {'result': msg.content}
-#             except json.JSONDecodeError:
-#                 return {"Error": "Failed to decode JSON from tool output"}
-#             break
-#     return {"Error": "Tool message not found"}
+#     - 只从 state 读数据（根据 input_arg_map）
+#     - 调用 MCP 工具 mcp_tool_name
+#     - 把结果写到 {output_key: result} 里返回
+#     """
+
+#     def state_tool(
+#         state: Annotated[dict, InjectedState]
+#     ) -> Dict[str, Any]:
+#         # 1. 从 state 中准备 MCP 调用参数
+#         tool_args = {}
+#         for state_key, mcp_arg_name in input_arg_map.items():
+#             if state_key not in state:
+#                 # 这里直接返回 errors，方便 Agent 看到并决定怎么做
+#                 return {"errors": [f"Missing required state key '{state_key}'"]}
+#             tool_args[mcp_arg_name] = state[state_key]
+
+#         # 2. 调用 MCP（第二层 helper）
+#         try:
+#             result = call_mcp_tool(
+#                 tool_name=mcp_tool_name,
+#                 server_script_path=server_script_path,
+#                 arguments=tool_args,
+#             )
+#         except Exception as e:
+#             return {"errors": [f"MCP call failed: {e}"]}
+
+#         # 3. 处理 MCP 返回结果
+#         if isinstance(result, str) and result.startswith("Error"):
+#             return {"errors": [result]}
+
+#         # 4. 返回 state_update（第三层）
+#         return {output_key: result}
+
+#     return state_tool
+
+
+
+
+
+
+
+
+
+
+
+def get_tool_result_from_messages(messages, tool_name):
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage) and msg.name == tool_name:
+            try:
+                return {'result': msg.content}
+            except json.JSONDecodeError:
+                return {"Error": "Failed to decode JSON from tool output"}
+            break
+    return {"Error": "Tool message not found"}
 
 def print_resp(resp):
     step_num = 1

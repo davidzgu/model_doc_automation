@@ -12,7 +12,9 @@ class WorkflowState(TypedDict, total=False):
     messages: Annotated[Sequence[BaseMessage], add_messages]
 
     # Business data
+    server_path: str
     csv_file_path: str
+    output_dir: str
     bsm_results_path: str
     greeks_results_path: str
     validate_results_path: str
