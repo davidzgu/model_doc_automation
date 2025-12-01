@@ -4,8 +4,6 @@ from typing import TypedDict, List, Dict, Any, Literal, Annotated, Sequence
 from langchain_core.messages import AnyMessage, BaseMessage
 from langgraph.graph.message import add_messages
 
-from bsm_multi_agents.tools.utils import JSON_STR
-
 
 class WorkflowState(TypedDict, total=False):
     # Conversation messages (for agents to read/append)

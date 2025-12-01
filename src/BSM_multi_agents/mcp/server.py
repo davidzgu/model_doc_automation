@@ -1,7 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from bsm_multi_agents.mcp.data_loader import validate_input_file
-from bsm_multi_agents.mcp.tool_calculator import calculate_bsm_to_file
-from bsm_multi_agents.mcp.tool_calculator import calculate_greeks_to_file
+from bsm_multi_agents.mcp.pricing_calculator import calculate_bsm_to_file
+from bsm_multi_agents.mcp.pricing_calculator import calculate_greeks_to_file
 
 # Initialize the MCP Server
 mcp = FastMCP("Quant Tools Server")

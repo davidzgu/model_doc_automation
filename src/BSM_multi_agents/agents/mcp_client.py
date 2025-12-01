@@ -1,4 +1,4 @@
-# src/bsm_multi_agents/agents/mcp_wrappers.py
+# src/bsm_multi_agents/agents/mcp_client.py
 import asyncio
 import sys
 import os
@@ -18,7 +18,7 @@ async def call_mcp_tool_async(
     arguments: Mapping[str, Any],
 ) -> Any:
     """
-    底层 async MCP 调用。
+    Low-level async MCP tool call.
     """
     server_params = StdioServerParameters(
         command=sys.executable,
@@ -41,7 +41,8 @@ def call_mcp_tool(
     arguments: Mapping[str, Any],
 ) -> Any:
     """
-    同步包装：方便在 REPL / 单元测试里直接调用 MCP 工具调试。
+    Synchronous wrapper: convenient for calling MCP tools directly
+    from a REPL or unit tests.
     """
     return asyncio.run(
         call_mcp_tool_async(tool_name, server_script_path, arguments)
@@ -52,8 +53,11 @@ import threading
 
 def run_in_new_loop(coro):
     """
-    在单独的线程中运行一个新的事件循环来执行协程。
-    这允许在已有的事件循环（如 Jupyter）中同步调用异步代码，而不需要 nest_asyncio。
+    Run a new event loop in a dedicated thread to execute a coroutine.
+
+    This allows synchronously calling async code from an environment
+    where an event loop is already running (e.g., Jupyter) without
+    using nest_asyncio.
     """
     result = None
     exception = None
@@ -82,17 +86,17 @@ def create_mcp_state_tool_wrapper(
     *,
     mcp_tool_name: str,
     server_script_path: str,
-    input_arg_map: Dict[str, str],   # state_key -> mcp_arg_name
-    output_key: str,                 # MCP 返回值写入 state 的字段名
+    input_arg_map: Dict[str, str],   
+    output_key: str,                
 ):
     """
-    返回一个 stateful 工具：
+    Return a stateful tool function:
 
       (state) -> state_update
 
-    - 从 state 中按 input_arg_map 取 key，拼成 MCP 调用参数
-    - 调 MCP 工具 mcp_tool_name
-    - 把 MCP 返回的结果写入 {output_key: result}，作为 state_update 返回
+    - Read keys from the state according to `input_arg_map` to build MCP arguments.
+    - Call the MCP tool `mcp_tool_name`.
+    - Put the MCP result into `{output_key: result}` and return it as the state_update.
     """
 
     def state_tool(
@@ -106,7 +110,7 @@ def create_mcp_state_tool_wrapper(
             else:
                 return {"errors": ["Critical: WorkflowState was not injected into tool."]}
 
-        # 1. 准备 MCP 参数
+        # 1. Prepare MCP arguments
         tool_args: Dict[str, Any] = {}
         missing_keys = []
         for state_key, mcp_arg_name in input_arg_map.items():
@@ -121,9 +125,9 @@ def create_mcp_state_tool_wrapper(
             err_msg = f"MCP tool '{mcp_tool_name}' missing state keys: {missing_keys}"
             return {"errors": [err_msg]}
 
-        # 2. 调用 MCP 工具
+        # 2. Call MCP tool
         try:
-            # 使用 run_in_new_loop 在新线程中运行异步 MCP 调用
+            # Use run_in_new_loop to run async MCP call in a new thread
             tool_res = run_in_new_loop(
                 call_mcp_tool_async(
                     tool_name=mcp_tool_name,
@@ -135,16 +139,15 @@ def create_mcp_state_tool_wrapper(
             err_msg = f"MCP tool '{mcp_tool_name}' call failed: {e}"
             return {"errors": [err_msg]}
 
-        # 3. 解析 MCP 返回结果
-        # fastmcp 的返回通常有 structuredContent / content
+        # 3. Parse MCP return result
         result_value = None
 
-        # 优先 structuredContent["result"]
+        # First try structuredContent["result"]
         sc = getattr(tool_res, "structuredContent", None)
         if isinstance(sc, dict) and "result" in sc:
             result_value = sc["result"]
 
-        # 其次 TextContent.text
+        # Next try TextContent.text
         if result_value is None:
             content = getattr(tool_res, "content", None)
             if content:
@@ -152,11 +155,11 @@ def create_mcp_state_tool_wrapper(
                 if hasattr(first, "text"):
                     result_value = first.text
 
-        # 再不行就 str()
+        # If all else fails, just str()
         if result_value is None:
             result_value = str(tool_res)
 
-        # 4. 返回 state_update
+        # 4. Return state_update
         return {output_key: result_value}
 
     return state_tool
