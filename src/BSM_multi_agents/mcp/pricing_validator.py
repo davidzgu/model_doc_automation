@@ -2,15 +2,7 @@ from typing import Union, Dict, Any, List, Annotated
 import json
 import pandas as pd
 
-from langchain.tools import tool
-from langgraph.prebuilt import InjectedState
 
-from .tool_registry import register_tool
-from .utils import load_json_as_df
-
-
-# @register_tool(tags=["greeks","validate"], roles=["validator"])
-# @tool("validate_greeks_rules")
 def _validate_greeks_rules(
         option_type: str,
         price: float, 
@@ -76,10 +68,9 @@ def _validate_greeks_rules(
     }
     return results
 
-@register_tool(tags=["greeks","validate","batch"], roles=["validator"])
-@tool("batch_greeks_validator")
+
 def batch_greeks_validator(
-    state: Annotated[dict, InjectedState]
+    input_path: str, output_dir: str
 ) -> str:
     """
     Validate Greeks for ALL options from CSV data.
@@ -97,11 +88,10 @@ def batch_greeks_validator(
         JSON string containing validate_results
     """
     try:
-        greeks_result = state.get("greeks_results")
-        if greeks_result is None:    
-            return json.dumps({"errors": [f"greeks_result is missing. State keys: {list(state.keys())}"]})
-        
-        df = load_json_as_df(greeks_result)
+        if not os.path.exists(input_path):
+            return f"Error: Input file not found at {input_path}"
+
+        df = pd.read_csv(input_path)
         required_cols = ['option_type', 'price', 'delta', 'gamma', 'vega']
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
@@ -123,8 +113,14 @@ def batch_greeks_validator(
             if col not in expanded:
                 expanded[col] = pd.NA
         df = pd.concat([df, expanded[result_cols]], axis=1)
-        result = {"validate_results": df.to_json(orient='records', date_format='iso')}
-        return json.dumps(result)
+        # Save to file
+        os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.basename(input_path).replace(".csv", "_validate_results.csv")
+        output_path = os.path.join(output_dir, filename)
+        
+        df.to_csv(output_path, index=False)
+        
+        return os.path.abspath(output_path)
 
     except Exception as e:
         return json.dumps({"errors": [f"Error: {str(e)}"]})

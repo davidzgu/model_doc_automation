@@ -20,7 +20,7 @@ def _bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, si
 
     return option_price
 
-def calculate_bsm_to_file(input_path: str, output_dir: str = "./output") -> str:
+def calculate_bsm_to_file(input_path: str, output_dir: str) -> str:
     """
     Reads the CSV at input_path, calculates BSM prices, and saves the result to output_dir.
     Returns the path to the result file.
