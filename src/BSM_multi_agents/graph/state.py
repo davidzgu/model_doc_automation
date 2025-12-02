@@ -9,16 +9,33 @@ class WorkflowState(TypedDict, total=False):
     # Conversation messages (for agents to read/append)
     messages: Annotated[Sequence[BaseMessage], add_messages]
 
-    # Business data
-    server_path: str
+    # core paths
     csv_file_path: str
     output_dir: str
-    bsm_results_path: str
+    server_path: str 
+
+    # pricing artifacts
+    pricing_results_path: str
     greeks_results_path: str
+
+    # validation artifacts
     validate_results_path: str
-    report_md_path: str
-    report_charts_path: str
-    report_path: str
+
+    # text artifacts
+    md_summary_text: str        
+    md_summary_path: str       
+    report_plan_text: str       
+    report_path: str      
+
+    # charts
+    chart_paths: List[str]      # 多张图片路径或目录 
+
+    # control flags (由 OrchestratorAgent 决定，可选）
+    run_pricing: bool
+    run_validation: bool
+    run_md_summary: bool
+    run_charts: bool
+    run_report: bool
 
     # Workflow control
     errors: Annotated[List[str], operator.add]
