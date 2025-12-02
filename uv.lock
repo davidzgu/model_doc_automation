@@ -407,7 +407,6 @@ wheels = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "defusedxml"
 version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -417,8 +416,6 @@ wheels = [
 ]
 
 [[package]]
-=======
->>>>>>> bca5bc4 (prepare for multi agents)
 name = "distro"
 version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -639,7 +636,6 @@ wheels = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
@@ -652,8 +648,6 @@ wheels = [
 ]
 
 [[package]]
-=======
->>>>>>> bca5bc4 (prepare for multi agents)
 name = "jiter"
 version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
@@ -722,7 +716,6 @@ wheels = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "json5"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -732,8 +725,6 @@ wheels = [
 ]
 
 [[package]]
-=======
->>>>>>> bca5bc4 (prepare for multi agents)
 name = "jsonpatch"
 version = "1.33"
 source = { registry = "https://pypi.org/simple" }
@@ -2254,7 +2245,6 @@ wheels = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "referencing"
 version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2269,8 +2259,6 @@ wheels = [
 ]
 
 [[package]]
-=======
->>>>>>> bca5bc4 (prepare for multi agents)
 name = "regex"
 version = "2025.11.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2628,7 +2616,6 @@ wheels = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "terminado"
 version = "0.18.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2643,8 +2630,6 @@ wheels = [
 ]
 
 [[package]]
-=======
->>>>>>> bca5bc4 (prepare for multi agents)
 name = "tiktoken"
 version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2692,7 +2677,6 @@ wheels = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "tinycss2"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2705,8 +2689,6 @@ wheels = [
 ]
 
 [[package]]
-=======
->>>>>>> bca5bc4 (prepare for multi agents)
 name = "tornado"
 version = "6.5.2"
 source = { registry = "https://pypi.org/simple" }
