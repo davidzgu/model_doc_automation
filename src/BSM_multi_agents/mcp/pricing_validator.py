@@ -1,6 +1,7 @@
 from typing import Union, Dict, Any, List, Annotated
 import json
 import pandas as pd
+import os
 
 
 def _validate_greeks_rules(
@@ -69,7 +70,7 @@ def _validate_greeks_rules(
     return results
 
 
-def batch_greeks_validator(
+def validate_greeks_to_file(
     input_path: str, output_dir: str
 ) -> str:
     """
