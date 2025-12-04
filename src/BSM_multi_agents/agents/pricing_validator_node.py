@@ -8,7 +8,7 @@ from bsm_multi_agents.graph.state import WorkflowState
 from bsm_multi_agents.agents.mcp_client import create_mcp_state_tool_wrapper
 
 
-def pricing_validator_agent_node(
+def pricing_validator_tool_node(
     state: WorkflowState,
 ) -> WorkflowState:
     """
