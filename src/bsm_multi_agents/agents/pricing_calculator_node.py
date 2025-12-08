@@ -4,7 +4,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from bsm_multi_agents.graph.state import WorkflowState
 from bsm_multi_agents.agents.mcp_client import create_mcp_state_tool_wrapper
-from bsm_multi_agents.config.llm_config import get_llm
+# from bsm_multi_agents.config.llm_config import get_llm
+from llm.llm_config import get_llm
 from bsm_multi_agents.prompts.loader import load_prompt
 
 

@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 # Set your preferences here (can be overridden by environment variables)
 
 # LLM Provider: "ollama" or "openai"
-DEFAULT_PROVIDER = "ollama"
+DEFAULT_PROVIDER = "openai"
 
 # Ollama settings
 DEFAULT_OLLAMA_MODEL = "qwen3:8b"
@@ -17,8 +17,7 @@ DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
 # WARNING: DO NOT commit your real API key to Git!
 # Instead, set OPENAI_API_KEY environment variable or create a .env file
-DEFAULT_OPENAI_API_KEY = None  # Set to your key for local testing ONLY
-
+DEFAULT_OPENAI_API_KEY = "None"
 # ===================================
 
 
@@ -30,10 +29,12 @@ def get_llm():
     1. Use Ollama (default): Just run the script
     2. Use OpenAI: Set environment variable LLM_PROVIDER=openai
     """
+    # print(1)
     provider = os.getenv("LLM_PROVIDER", DEFAULT_PROVIDER)
 
     if provider == "openai":
         api_key = os.getenv("OPENAI_API_KEY", DEFAULT_OPENAI_API_KEY)
+        print("openai")
         if not api_key:
             raise ValueError(
                 "OPENAI_API_KEY not set. Either:\n"

@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 from bsm_multi_agents.graph.state import WorkflowState
 from bsm_multi_agents.tools.summary_generator_tools import generate_summary
-
+from bsm_multi_agents.agents.mcp_client import create_mcp_state_tool_wrapper
 
 
 def summary_generator_node(
