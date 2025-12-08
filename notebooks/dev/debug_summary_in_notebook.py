@@ -16,7 +16,7 @@ print("=" * 80)
 from bsm_multi_agents.graph.state import WorkflowState
 from bsm_multi_agents.agents.data_loader_agent import data_loader_node
 from bsm_multi_agents.agents.calculator_agent import calculator_node
-from bsm_multi_agents.agents.pricing_validator_agent import validator_node
+from bsm_multi_agents.agents.pricing_validator_node import validator_node
 from bsm_multi_agents.agents.summary_generator_agent import summary_generator_node
 
 # 1. 执行前面的节点获取数据
