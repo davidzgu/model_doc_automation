@@ -50,3 +50,4 @@ def pricing_validator_tool_node(
     
     state["errors"] = errors
     return state
+

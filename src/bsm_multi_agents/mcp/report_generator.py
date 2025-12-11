@@ -3,8 +3,8 @@ from typing import Optional
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from openai import OpenAI
-from bsm_multi_agents.config.llm_config import DEFAULT_OPENAI_API_KEY
+from anthropic import Anthropic
+from bsm_multi_agents.config.llm_config_claude import DEFAULT_ANTHROPIC_API_KEY
 import datetime 
 
 def summary_to_word(
@@ -45,10 +45,10 @@ def summary_to_word(
     if not os.path.exists(summary_docx_path):
         raise FileNotFoundError(f"Summary file not found: {summary_docx_path}")
 
-    api_key = os.getenv("OPENAI_API_KEY", DEFAULT_OPENAI_API_KEY)
+    api_key = os.getenv("API_KEY", DEFAULT_ANTHROPIC_API_KEY)
     if not api_key:
         raise RuntimeError(
-            "OPENAI_API_KEY is not set in the environment. "
+            "API_KEY is not set in the environment. "
             "Please export it before calling this tool."
         )
 
@@ -64,15 +64,17 @@ def summary_to_word(
     if not raw_summary_text:
         raise ValueError("No non-empty text found in the summary document.")
 
-    # --------- 2. Refine summary via OpenAI API ---------
-    client = OpenAI(api_key=api_key)
+    # --------- 2. Refine summary via Claude API ---------
+    client = Anthropic(api_key=api_key)
 
     system_prompt = (
-        "You are a quantitative finance expert and technical writer. "
-        "Given a rough summary about a quantitative analysis, rewrite it into a clear, "
-        "well-structured Section 2 of a professional report. "
-        "Use concise English, with logical flow and numbered or bulleted lists where helpful. "
+        "You are a quantitative finance analyst who conducts model performance ongoing monitoring and writes the monitoring report. "
+        "Given a rough summary about a quantitative analysis and or test, you can present it into a clear, well-structured Section 2 of a professional report. "
+        "You will first generate a clear and concise narrative based on the provided raw summary. "
+        "You will then format the narrative into a professional and clear section, with headings, subheadings, and bullet points as needed. "
+        "Then, you will present the raw summary into tables and plots, for each asset class, generate a table and a plot to show change over time."
         "Do NOT include a title page or table of contents; only the Section 2 narrative itself."
+        "After generating all contents of Section, you will examine all contents and improve on the format of Section 2 so that the report is clear and clean, without unnecessary symbols. Do make sure to include the tables and plots."
     )
 
     user_prompt = (
@@ -81,16 +83,17 @@ def summary_to_word(
         f"{raw_summary_text}"
     )
 
-    # Using chat.completions; you can swap to Responses API if you prefer
-    completion = client.chat.completions.create(
-        model="gpt-4.1-mini",
+    # Using Claude API with system prompt
+    completion = client.messages.create(
+        model="claude-3-7-sonnet-latest",
+        max_tokens=2048,
+        system=system_prompt,
         messages=[
-            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.3,
     )
-    refined_summary = completion.choices[0].message.content.strip()
+    refined_summary = completion.content[0].text.strip()
 
     # --------- 3. Create new Word document ---------
     doc = Document()
@@ -172,6 +175,11 @@ def summary_to_word(
         if block:
             doc.add_paragraph(block)
 
+
+# add the pricing table, by asset class, 
+# price's time series make into figures using LLM, add here
+# adjust formating and update the prompt
+# pending: add testing, rn only >0.
     # --------- 4. Save ---------
     doc.save(output_docx_path)
     return os.path.abspath(output_docx_path)

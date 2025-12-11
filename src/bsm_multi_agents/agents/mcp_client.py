@@ -29,10 +29,21 @@ async def call_mcp_tool_async(
     #     command="uv",
     #     args=["run", "python", server_script_path],
     # )
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            return await session.call_tool(tool_name, arguments=arguments)
+    # When running inside Jupyter, `sys.stderr`/`sys.stdout` are ipykernel
+    # streams that do not implement a usable `fileno()` which breaks
+    # subprocess creation on Windows. Provide a real file object (devnull)
+    # for the child process stderr to avoid this issue.
+    devnull = open(os.devnull, "w", encoding=server_params.encoding)
+    try:
+        async with stdio_client(server_params, errlog=devnull) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await session.call_tool(tool_name, arguments=arguments)
+    finally:
+        try:
+            devnull.close()
+        except Exception:
+            pass
 
 
 def call_mcp_tool(

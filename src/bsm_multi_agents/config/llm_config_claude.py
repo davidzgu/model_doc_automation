@@ -13,7 +13,7 @@ DEFAULT_CLAUDE_MODEL = "claude-3-7-sonnet-latest"
 
 # WARNING: DO NOT commit your real API key to Git!
 # Instead, set ANTHROPIC_API_KEY environment variable or create a .env file
-DEFAULT_ANTHROPIC_API_KEY = "None"
+DEFAULT_ANTHROPIC_API_KEY = "Nonw"
 # ===================================
 
 
