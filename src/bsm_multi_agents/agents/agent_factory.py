@@ -4,7 +4,7 @@ from pathlib import Path
 
 from bsm_basic_agent.prompts.loader import load_prompt
 from bsm_multi_agents.tools import get_tools_for_role
-from bsm_multi_agents.config.llm_config import get_llm
+from bsm_multi_agents.config.llm_config_claude import get_llm
 from bsm_multi_agents.graph.state import WorkflowState
 
 from langchain_core.prompts import ChatPromptTemplate
