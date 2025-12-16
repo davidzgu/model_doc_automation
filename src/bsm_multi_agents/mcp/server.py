@@ -8,8 +8,8 @@ from bsm_multi_agents.mcp.pricing_validator import validate_greeks_to_file
 mcp = FastMCP("Quant Tools Server")
 
 # Register tools
-mcp.add_tool(validate_input_file)
-mcp.add_tool(calculate_bsm_to_file)
+# mcp.add_tool(validate_input_file)
+# mcp.add_tool(calculate_bsm_to_file)
 mcp.add_tool(calculate_greeks_to_file)
 mcp.add_tool(validate_greeks_to_file)
 

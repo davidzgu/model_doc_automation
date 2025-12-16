@@ -4,52 +4,32 @@ import asyncio
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 
 
+def extract_mcp_content(tool_res) -> str:
+    """Helper to extract text content from MCP CallToolResult"""
+    result_value = None
+    
+    # Try structuredContent["result"]
+    sc = getattr(tool_res, "structuredContent", None)
+    if isinstance(sc, dict) and "result" in sc:
+        result_value = sc["result"]
 
-# def create_mcp_state_tool_wrapper(
-#     *,  # 推荐用 keyword-only，避免顺序错
-#     mcp_tool_name: str,
-#     server_script_path: str,
-#     input_arg_map: Dict[str, str],
-#     output_key: str,
-# ):
-#     """
-#     返回一个函数： state -> state_update
+    # Try TextContent.text
+    if result_value is None:
+        content = getattr(tool_res, "content", None)
+        if content:
+            # content is a list of TextContent or ImageContent
+            texts = []
+            for item in content:
+                if hasattr(item, "text"):
+                    texts.append(item.text)
+            if texts:
+                result_value = "\n".join(texts)
 
-#     - 只从 state 读数据（根据 input_arg_map）
-#     - 调用 MCP 工具 mcp_tool_name
-#     - 把结果写到 {output_key: result} 里返回
-#     """
-
-#     def state_tool(
-#         state: Annotated[dict, InjectedState]
-#     ) -> Dict[str, Any]:
-#         # 1. 从 state 中准备 MCP 调用参数
-#         tool_args = {}
-#         for state_key, mcp_arg_name in input_arg_map.items():
-#             if state_key not in state:
-#                 # 这里直接返回 errors，方便 Agent 看到并决定怎么做
-#                 return {"errors": [f"Missing required state key '{state_key}'"]}
-#             tool_args[mcp_arg_name] = state[state_key]
-
-#         # 2. 调用 MCP（第二层 helper）
-#         try:
-#             result = call_mcp_tool(
-#                 tool_name=mcp_tool_name,
-#                 server_script_path=server_script_path,
-#                 arguments=tool_args,
-#             )
-#         except Exception as e:
-#             return {"errors": [f"MCP call failed: {e}"]}
-
-#         # 3. 处理 MCP 返回结果
-#         if isinstance(result, str) and result.startswith("Error"):
-#             return {"errors": [result]}
-
-#         # 4. 返回 state_update（第三层）
-#         return {output_key: result}
-
-#     return state_tool
-
+    # Fallback
+    if result_value is None:
+        result_value = str(tool_res)
+        
+    return str(result_value)
 
 
 

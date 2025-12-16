@@ -1,23 +1,22 @@
 from pathlib import Path
-
-from langchain_core.messages import HumanMessage, SystemMessage
-
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from bsm_multi_agents.graph.state import WorkflowState
-from bsm_multi_agents.agents.mcp_client import create_mcp_state_tool_wrapper
 from bsm_multi_agents.config.llm_config import get_llm
-from bsm_multi_agents.prompts.loader import load_prompt
+from bsm_multi_agents.agents.mcp_adapter import (
+    call_mcp_tool,
+    list_mcp_tools_sync, 
+    mcp_tool_to_langchain_tool
+)
+
+from bsm_multi_agents.agents.utils import extract_mcp_content
+
 
 
 
 def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
     """
     LangGraph node: LLM planning / explanation step.
-
-    Objectives:
-    - Given `csv_file_path` and `output_dir`,
-        generate an explanation and plan for running BSM and Greeks calculations.
-    - This node does not call tools directly; it only appends messages
-        to the shared workflow state.
+    Dynamically fetches tools from the MCP server and binds them to the LLM.
     """
     errors = state.get("errors", [])
 
@@ -26,110 +25,114 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
         state["errors"] = errors
         return state
 
-    # if "output_dir" not in state or not state["output_dir"]:
-    #     state["output_dir"] = str(
-    #         Path(__file__).resolve().parents[1] / "data" / "cache"
-    #     )
+    server_path = state.get("server_path")
+    if not server_path:
+        errors.append("pricing_calculator_agent_node: server_path is missing")
+        state["errors"] = errors
+        return state
 
+    output_dir = state.get("output_dir")
+    
+    # 1. Discover MCP tools
+    try:
+        mcp_tools = list_mcp_tools_sync(server_path)
+    except Exception as e:
+        errors.append(f"pricing_calculator_agent_node: Failed to list MCP tools: {e}")
+        state["errors"] = errors
+        return state
 
-    # prompts
-    system_prompt = """
-    You are a quantitative calculator agent.
-    You have access to tools that call an external MCP server.
-    Each tool reads input file paths from the shared workflow state
-    and writes result file paths back into the state.
-    Do NOT ask for raw CSV content. Always work with paths only.
-    You do not need to provide any arguments to the tools. Just call them with {}.
-    """
-
-    prompt_path = (
-        Path(__file__).resolve().parents[1]
-        / "prompts"
-        / "calculator_prompts.txt"
+    # 2. Convert to LangChain tools
+    langchain_tools = [mcp_tool_to_langchain_tool(t, server_path) for t in mcp_tools]
+    
+    # 3. Bind tools to LLM
+    llm = get_llm().bind_tools(langchain_tools)
+    
+    # 4. Construct Prompt
+    # We give the LLM the context (files) and let it choose the tools.
+    system_prompt = (
+        "You are a quantitative calculator agent. "
+        "You have access to tools specifically for Greeks calculation via an MCP server. "
+        "Use the available tools to process the requested data. "
+        "You should typically validate the input first, then run calculations. "
+        "If you are confident, you can run all tools in parallel."
     )
-    user_prompt_template = load_prompt(prompt_path)
-    formatted_user_prompt = (
-        user_prompt_template.format(csv_file_path=state["csv_file_path"])
-        if "{csv_file_path}" in user_prompt_template
-        else user_prompt_template
+    
+    user_prompt = (
+        f"Input CSV File: {state['csv_file_path']}\n"
+        f"Output Directory: {output_dir}\n\n"
+        "Please calculate the Greeks for the options in the input CSV file. "
+        "Save the results to the output directory. "
+        "Ensure you call the calculation tools."
     )
-
-    # agent
-    llm = get_llm()
-    system_msg = SystemMessage(content=system_prompt)
-    human_msg = HumanMessage(content=formatted_user_prompt)
-    ai_msg = llm.invoke([system_msg, human_msg])
 
     messages = list(state.get("messages", []))
-    messages.extend([system_msg, human_msg, ai_msg])
-    state["messages"] = messages
-
+    if not messages:
+         messages.append(SystemMessage(content=system_prompt))
+         messages.append(HumanMessage(content=user_prompt))
+    
+    # Invoke
+    try:
+        ai_msg = llm.invoke(messages)
+        messages.append(ai_msg)
+        state["messages"] = messages
+    except Exception as e:
+        errors.append(f"pricing_calculator_agent_node: LLM invocation failed: {e}")
+    
     state["errors"] = errors
     return state
 
-    # tools = build_mcp_calculator_tools(server_path)
 
-    
 def pricing_calculator_tool_node(state: WorkflowState) -> WorkflowState:
     """
-    Tool node: pure tool logic, no LLM involved.
-
-    - Read `server_path`, `csv_file_path`, and `output_dir` from the state.
-    - Call `calculate_bsm_to_file` and `calculate_greeks_to_file` via the MCP server.
-    - Write the generated result file paths into:
-        state["bsm_results_path"]
-        state["greeks_results_path"]
-    - Collect any errors and write them back to state["errors"].
+    Tool node: Executes tool calls generated by the agent.
     """
     errors = state.get("errors", [])
-
-    if "csv_file_path" not in state or not state["csv_file_path"]:
-        errors.append("pricing_calculator_tool_node: csv_file_path is missing")
-        state["errors"] = errors
+    messages = list(state.get("messages", []))
+    
+    if not messages:
         return state
-
-    if "server_path" not in state or not state["server_path"]:
+        
+    last_msg = messages[-1]
+    if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
+        return state
+    
+    server_path = state.get("server_path")
+    if not server_path:
         errors.append("pricing_calculator_tool_node: server_path is missing")
         state["errors"] = errors
         return state
+
+    # Ensure tool_outputs dict exists
+    if "tool_outputs" not in state or state["tool_outputs"] is None:
+         state["tool_outputs"] = {}
+
+    tool_outputs_msgs = []
     
-    server_path = state["server_path"]
-
-    bsm_state_fn = create_mcp_state_tool_wrapper(
-        mcp_tool_name="calculate_bsm_to_file",
-        server_script_path=server_path,
-        input_arg_map={
-            "csv_file_path": "input_path",
-            "output_dir": "output_dir",
-        },
-        output_key="bsm_results_path",
-    )
-
-    greeks_state_fn = create_mcp_state_tool_wrapper(
-        mcp_tool_name="calculate_greeks_to_file",
-        server_script_path=server_path,
-        input_arg_map={
-            "csv_file_path": "input_path",
-            "output_dir": "output_dir",
-        },
-        output_key="greeks_results_path",
-    )
-
-    bsm_update = bsm_state_fn(state=state)
-    greeks_update = greeks_state_fn(state=state)
-
-    # bsm_update / greeks_update 形如：
-    #   {"bsm_results_path": "..."} 或 {"errors": [...]}
-    if "errors" in bsm_update:
-        errors.extend(bsm_update["errors"])
-    if "errors" in greeks_update:
-        errors.extend(greeks_update["errors"])
-
-    if "bsm_results_path" in bsm_update:
-        state["bsm_results_path"] = bsm_update["bsm_results_path"]
-    if "greeks_results_path" in greeks_update:
-        state["greeks_results_path"] = greeks_update["greeks_results_path"]
-
+    for tool_call in last_msg.tool_calls:
+        tool_name = tool_call["name"]
+        args = tool_call["args"]
+        call_id = tool_call["id"]
+        
+        
+        try:
+            # Execute logic
+            raw_result = call_mcp_tool(tool_name, server_path, args)
+            result_text = extract_mcp_content(raw_result)
+            
+            # Create ToolMessage
+            tool_outputs_msgs.append(ToolMessage(content=result_text, tool_call_id=call_id, name=tool_name))
+            
+            # Generic Output Handling: Store by tool name
+            state["greeks_results_path"] = result_text.strip()
+            
+                
+        except Exception as e:
+            err_msg = f"Error executing {tool_name}: {e}"
+            errors.append(err_msg)
+            tool_outputs_msgs.append(ToolMessage(content=err_msg, tool_call_id=call_id, is_error=True))
+            
+    messages.extend(tool_outputs_msgs)
+    state["messages"] = messages
     state["errors"] = errors
     return state
 
@@ -139,10 +142,34 @@ if __name__ == "__main__":
     csv_file_path = str(project_root / "data/input/dummy_options.csv")
     output_dir = str(project_root / "data/cache")
     server_path = str(project_root / "src" / "bsm_multi_agents" / "mcp" / "server.py")
+    
     state = WorkflowState(
         csv_file_path=csv_file_path, 
         output_dir=output_dir, 
-        server_path=server_path
+        server_path=server_path,
+        errors=[],
+        messages=[]
     )
-    result_state = pricing_calculator_agent_node(state)
-    print(result_state)
+    
+    print("--- Starting Agent Loop ---")
+    for step in range(3):
+        print(f"\nStep {step + 1}: Agent")
+        state = pricing_calculator_agent_node(state)
+        last_msg = state["messages"][-1]
+        
+        if not last_msg.tool_calls:
+            print("Agent decided to stop (no tool calls).")
+            break
+            
+        print(f"Tool calls: {len(last_msg.tool_calls)}")
+        for tc in last_msg.tool_calls:
+            print(f" - {tc['name']}")
+        
+        print(f"Step {step + 1}: Tool execution")
+        state = pricing_calculator_tool_node(state)
+        
+    print("\n Final State Keys:", state.keys())
+    if "bsm_results_path" in state:
+        print("BSM Results Path:", state["bsm_results_path"])
+    else:
+        print("BSM Results Path MISSING")

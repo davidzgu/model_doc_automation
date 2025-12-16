@@ -5,7 +5,7 @@ from typing import Dict, Any
 from langchain_core.messages import HumanMessage
 
 from bsm_multi_agents.graph.state import WorkflowState
-from bsm_multi_agents.agents.mcp_client import create_mcp_state_tool_wrapper
+from bsm_multi_agents.agents.mcp_adapter import create_mcp_state_tool_wrapper
 
 
 def pricing_validator_tool_node(

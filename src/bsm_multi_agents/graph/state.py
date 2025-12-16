@@ -8,6 +8,9 @@ from langgraph.graph.message import add_messages
 class WorkflowState(TypedDict, total=False):
     # Conversation messages (for agents to read/append)
     messages: Annotated[Sequence[BaseMessage], add_messages]
+    
+    # Generic tool outputs
+    tool_outputs: Dict[str, Any]
 
     # core paths
     csv_file_path: str
@@ -15,7 +18,7 @@ class WorkflowState(TypedDict, total=False):
     server_path: str 
 
     # pricing artifacts
-    pricing_results_path: str
+    bsm_results_path: str
     greeks_results_path: str
 
     # validation artifacts
