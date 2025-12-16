@@ -53,7 +53,6 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
         "You are a quantitative calculator agent. "
         "You have access to tools specifically for Greeks calculation via an MCP server. "
         "Use the available tools to process the requested data. "
-        "You should typically validate the input first, then run calculations. "
         "If you are confident, you can run all tools in parallel."
     )
     
@@ -66,9 +65,9 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
     )
 
     messages = list(state.get("messages", []))
-    if not messages:
-         messages.append(SystemMessage(content=system_prompt))
-         messages.append(HumanMessage(content=user_prompt))
+    messages.append(SystemMessage(content=system_prompt))
+    messages.append(HumanMessage(content=user_prompt))
+         
     
     # Invoke
     try:
