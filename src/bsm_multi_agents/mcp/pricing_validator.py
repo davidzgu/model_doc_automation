@@ -126,3 +126,58 @@ def validate_greeks_to_file(
     except Exception as e:
         return json.dumps({"errors": [f"Error: {str(e)}"]})
 
+
+def gamma_positivity_test(
+    input_path: str, output_dir: str
+) -> str:
+    """
+    Validate Greeks for ALL options from CSV data.
+
+    For each option:
+    - Validates: price > 0
+    - Validates: delta in [0,1] for calls, [-1,0] for puts
+    - Validates: gamma >= 0, vega >= 0
+
+    Args:
+        state: InjectedState, state from the workflow, which contains csv_data
+
+
+    Returns:
+        JSON string containing validate_results
+    """
+    try:
+        if not os.path.exists(input_path):
+            return f"Error: Input file not found at {input_path}"
+
+        df = pd.read_csv(input_path)
+        required_cols = ['option_type', 'price', 'delta', 'gamma', 'vega']
+        S = self.greeks_calculator.bs_model.S
+        K = self.greeks_calculator.bs_model.K
+        T = self.greeks_calculator.bs_model.T
+        r = self.greeks_calculator.bs_model.r
+        sigma = self.greeks_calculator.bs_model.sigma
+        option_type = self.greeks_calculator.bs_model.option_type
+        initial_greeks = self.greeks_calculator.calculate()
+        initial_price = initial_greeks['price']
+        delta = initial_greeks['delta']
+        gamma = initial_greeks['gamma']
+        greek_based_pnl = delta * price_change + 0.5 * gamma * (price_change ** 2)
+        new_S = S + price_change
+        new_price = self.greeks_calculator.calculate(new_S)['price']
+        revaluation_based_pnl = new_price - initial_price
+        print(f"Initial Price: {initial_price:.2f}")
+        print(f"New Price: {new_price:.2f}")
+        print(f"Greek-based PnL: {greek_based_pnl:.2f}")
+        print(f"Revaluation-based PnL: {revaluation_based_pnl:.2f}")
+        
+        # Save to file
+        os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.basename(input_path).replace(".csv", "_validate_results.csv")
+        output_path = os.path.join(output_dir, filename)
+        
+        df.to_csv(output_path, index=False)
+        
+        return os.path.abspath(output_path)
+
+    except Exception as e:
+        return json.dumps({"errors": [f"Error: {str(e)}"]})

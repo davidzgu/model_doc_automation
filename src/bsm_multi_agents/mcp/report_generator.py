@@ -6,10 +6,16 @@ from docx.oxml.ns import qn
 from openai import OpenAI
 from bsm_multi_agents.config.llm_config import DEFAULT_OPENAI_API_KEY
 import datetime 
+import csv
+import pandas as pd
+from io import BytesIO
+import matplotlib.pyplot as plt
+from docx.shared import Inches
 
 def summary_to_word(
     summary_docx_path: str,
     output_docx_path: str = "final_OPA_report.docx",
+    pricing_path: str = "./",
     title: str = "Ongoing Monitoring Analysis Report",
     model_name: str = "Option Pricing, BSM",
     author_name: str = "John Doe",
@@ -166,6 +172,60 @@ def summary_to_word(
     # SECTION 2 – Refined Summary
     # ============================
     doc.add_heading("2. Summary of Analysis", level=1)
+
+    
+
+    # Read CSV
+    # with open(pricing_path, newline="", encoding="utf-8") as f:
+    #     reader = csv.reader(f)
+    #     rows = list(reader)
+    df_pricing = pd.read_csv(pricing_path)
+
+    for asset in ["FX", "Equity", "Commodity"]:
+        doc.add_paragraph("The pricing output of "+asset+ " listed in the below table,")
+        df = df_pricing[df_pricing["asset_class"] == asset]
+        df = df.sort_values("T")
+        df = df.dropna()
+
+        # Create table (rows = data + header)
+        table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
+        table.style = "Table Grid"
+
+        # Header row
+        for col_idx, col_name in enumerate(df.columns):
+            cell = table.rows[0].cells[col_idx]
+            cell.text = str(col_name)
+            cell.paragraphs[0].runs[0].bold = True
+
+        # Data rows
+        for row_idx in range(df.shape[0]):
+            for col_idx in range(df.shape[1]):
+                table.rows[row_idx + 1].cells[col_idx].text = str(df.iat[row_idx, col_idx])
+
+        
+        fig, ax = plt.subplots()
+        df_call = df[df["option_type"] == "call"]
+        ax.plot(df_call["T"], df_call["BSM_Price"], label = "call")
+        df_put = df[df["option_type"] == "put"]
+        ax.plot(df_put["T"], df_put["BSM_Price"], label = "put")
+
+        ax.set_xlabel("Time to Maturity (T)")
+        ax.set_ylabel("Option Price (BSM)")
+        ax.set_title(f"Option Pricing Curve – {asset}")  
+        ax.legend()
+
+        # Save figure to memory (PNG bytes)
+        img_stream = BytesIO()
+        fig.savefig(img_stream, format="png", dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        img_stream.seek(0)
+
+        # Insert figure
+        doc.add_picture(img_stream, width=Inches(6.5))
+
+
+    # Paragraph AFTER table
+    # doc.add_paragraph("")    
 
     for block in refined_summary.split("\n\n"):
         block = block.strip()
