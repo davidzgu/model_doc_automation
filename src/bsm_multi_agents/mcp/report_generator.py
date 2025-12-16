@@ -186,22 +186,6 @@ def summary_to_word(
         df = df_pricing[df_pricing["asset_class"] == asset]
         df = df.sort_values("T")
         df = df.dropna()
-
-        # Create table (rows = data + header)
-        table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
-        table.style = "Table Grid"
-
-        # Header row
-        for col_idx, col_name in enumerate(df.columns):
-            cell = table.rows[0].cells[col_idx]
-            cell.text = str(col_name)
-            cell.paragraphs[0].runs[0].bold = True
-
-        # Data rows
-        for row_idx in range(df.shape[0]):
-            for col_idx in range(df.shape[1]):
-                table.rows[row_idx + 1].cells[col_idx].text = str(df.iat[row_idx, col_idx])
-
         
         fig, ax = plt.subplots()
         df_call = df[df["option_type"] == "call"]
@@ -220,8 +204,66 @@ def summary_to_word(
         plt.close(fig)
         img_stream.seek(0)
 
+        system_prompt = (
+            "Please summmarize the option pricing results (pull and call) from the tables with the following topics"
+            "1. Overall Data Quality"
+            "2. Pricing Level by Asset Class"
+            "3. Term Structure (Price vs Maturity)"
+            "4. Call vs Put Behavior"
+            "5. Model Consistency"
+            "6. Key Takeaway"
+            "Also, we have some annotation for you to understand table columns"
+            "- **Valuation Date:** The date on which the option price is calculated."
+            "- **Spot Price (S):** Current price of the underlying asset."
+            "- **Strike Price (K):** Exercise price of the option."
+            "- **Time to Maturity (T):** Time remaining until option expiration, expressed in years."
+            "- **Risk-Free Rate (r):** Annualized risk-free interest rate, used for discounting."
+            "- **Volatility (σ):** Annualized standard deviation of the underlying asset’s returns."
+            "- **Option Type:** Call or Put."
+            "- **Asset Class:** Classification of the underlying asset (e.g., equity, index)."
+        )
+
+        user_prompt = (
+            "Here is the raw pull and call price tables that should become the option pricing output summary section. The title should have this asset class name."
+            "Please refine it as described:\n\n"
+            f"{df_call}"
+            f"{df_put}"
+        )
+
+        # Using chat.completions; you can swap to Responses API if you prefer
+        completion = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+        )
+        refined_summary1 = completion.choices[0].message.content.strip() 
+        for block in refined_summary1.split("\n\n"):
+            block = block.strip()
+            if block:
+                doc.add_paragraph(block)        
+
+
+
         # Insert figure
         doc.add_picture(img_stream, width=Inches(6.5))
+
+        # Create table (rows = data + header)
+        table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
+        table.style = "Table Grid"
+
+        # Header row
+        for col_idx, col_name in enumerate(df.columns):
+            cell = table.rows[0].cells[col_idx]
+            cell.text = str(col_name)
+            cell.paragraphs[0].runs[0].bold = True
+
+        # Data rows
+        for row_idx in range(df.shape[0]):
+            for col_idx in range(df.shape[1]):
+                table.rows[row_idx + 1].cells[col_idx].text = str(df.iat[row_idx, col_idx])
 
 
     # Paragraph AFTER table
