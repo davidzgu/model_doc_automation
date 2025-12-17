@@ -11,7 +11,7 @@ from bsm_multi_agents.agents.pricing_calculator_nodes import calculator_node
 from bsm_multi_agents.agents.pricing_validator_agent import validator_node
 from bsm_multi_agents.agents.summary_generator_agent import summary_generator_node
 from bsm_multi_agents.agents.chart_generator_agent import chart_generator_node
-from bsm_multi_agents.agents.report_generator_agent import report_generator_node
+from bsm_multi_agents.agents.report_generator_node import report_generator_node
 
 
 
