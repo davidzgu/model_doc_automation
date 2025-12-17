@@ -38,8 +38,6 @@ def extract_mcp_content(tool_res) -> str:
 
 
 
-
-
 def get_tool_result_from_messages(messages, tool_name):
     for msg in reversed(messages):
         if isinstance(msg, ToolMessage) and msg.name == tool_name:
