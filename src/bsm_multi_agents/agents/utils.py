@@ -1,8 +1,16 @@
-from typing import Dict, Any, Iterable
 import asyncio
+import os
+import importlib.util
+import inspect
+from typing import Dict, Any, Iterable, List
 
+from langchain_core.tools import StructuredTool
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 
+from bsm_multi_agents.agents.mcp_adapter import (
+    list_mcp_tools_sync, 
+    mcp_tool_to_langchain_tool
+)
 
 def extract_mcp_content(tool_res) -> str:
     """Helper to extract text content from MCP CallToolResult"""
@@ -30,10 +38,6 @@ def extract_mcp_content(tool_res) -> str:
         result_value = str(tool_res)
         
     return str(result_value)
-
-
-
-
 
 
 
@@ -85,3 +89,40 @@ def print_resp(resp):
     print(f"Final outputs:")
     print(f"{'='*80}\n")
     print(resp["messages"][-1].content)
+
+
+def load_local_tools_from_file(file_path: str) -> List[StructuredTool]:
+    """
+    Load LangChain StructuredTools from a local Python file.
+    Each function in the file is converted into a tool.
+    """
+    if not os.path.exists(file_path):
+        return []
+
+    module_name = os.path.basename(file_path).replace(".py", "")
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        return []
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    tools = []
+    for name, func in inspect.getmembers(module, inspect.isfunction):
+        # Exclude private functions or imports
+        if not name.startswith("_") and func.__module__ == module_name:
+            tools.append(StructuredTool.from_function(func))
+    
+    return tools
+
+
+def load_tools_from_mcp_and_local(server_path:str, local_tool_paths:List[str]):
+    mcp_tools = list_mcp_tools_sync(server_path)
+
+    langchain_tools = [mcp_tool_to_langchain_tool(t, server_path) for t in mcp_tools]
+    
+    for path in local_tool_paths:
+        local_tools = load_local_tools_from_file(path)
+        langchain_tools.extend(local_tools)
+
+    return langchain_tools

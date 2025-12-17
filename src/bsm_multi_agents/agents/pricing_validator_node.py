@@ -6,12 +6,8 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 
 from bsm_multi_agents.graph.state import WorkflowState
 from bsm_multi_agents.config.llm_config import get_llm
-from bsm_multi_agents.agents.mcp_adapter import (
-    call_mcp_tool,
-    list_mcp_tools_sync, 
-    mcp_tool_to_langchain_tool
-)
-from bsm_multi_agents.agents.utils import extract_mcp_content
+from bsm_multi_agents.agents.mcp_adapter import call_mcp_tool
+from bsm_multi_agents.agents.utils import extract_mcp_content, load_tools_from_mcp_and_local
 
 
 def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
@@ -34,21 +30,11 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
 
     output_dir = state.get("output_dir")
     
-    # 1. Discover MCP tools
-    try:
-        mcp_tools = list_mcp_tools_sync(server_path)
-    except Exception as e:
-        errors.append(f"pricing_calculator_agent_node: Failed to list MCP tools: {e}")
-        state["errors"] = errors
-        return state
-
-    # 2. Convert to LangChain tools
-    langchain_tools = [mcp_tool_to_langchain_tool(t, server_path) for t in mcp_tools]
+    local_tool_paths = state.get("local_tool_paths", [])
+    langchain_tools = load_tools_from_mcp_and_local(server_path, local_tool_paths)
     
-    # 3. Bind tools to LLM
     llm = get_llm().bind_tools(langchain_tools)
     
-    # 4. Construct Prompt
     # We give the LLM the context (files) and let it choose the tools.
     system_prompt = (
         "You are a quantitative validator agent. "

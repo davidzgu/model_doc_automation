@@ -34,7 +34,7 @@ class WorkflowState(TypedDict, total=False):
     chart_paths: List[str]      # 多张图片路径或目录 
 
     # tool path
-    tool_path: List[str] = []
+    local_tool_paths: List[str] = []
 
     # control flags (由 OrchestratorAgent 决定，可选）
     run_pricing: bool
@@ -48,6 +48,6 @@ class WorkflowState(TypedDict, total=False):
     remaining_steps: Annotated[int, operator.add]
 
     def add_tool_path(self, path: str):
-        if "tool_path" not in self.tool_path:
-            self["tool_path"].append(path)
+        if path not in self.local_tool_paths:
+            self["local_tool_paths"].append(path)
         

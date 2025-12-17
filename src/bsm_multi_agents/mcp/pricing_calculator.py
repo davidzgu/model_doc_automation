@@ -48,7 +48,7 @@ def calculate_bsm_to_file(input_path: str, output_dir: str) -> str:
                 row['sigma']
             )
         
-        df['BSM_Price'] = df.apply(calc_row, axis=1)
+        df['BSM_price'] = df.apply(calc_row, axis=1)
         
         # Save to file
         os.makedirs(output_dir, exist_ok=True)
@@ -76,12 +76,12 @@ def _greeks_calculator(option_type: str, S: float, K: float, T: float, r: float,
         sigma (float): Volatility (annualized)
 
     Returns:
-        str: JSON string containing price, delta, gamma, vega, rho, theta
+        str: JSON string containing BSM_price, delta, gamma, vega, rho, theta
     """
 
     def _error_result(message: str) -> dict:
         return {
-            "price": np.nan,
+            "BSM_price": np.nan,
             "delta": np.nan,
             "gamma": np.nan,
             "vega": np.nan,
@@ -104,14 +104,14 @@ def _greeks_calculator(option_type: str, S: float, K: float, T: float, r: float,
         d2 = d1 - sigma * np.sqrt(T)
 
         if option_type == 'call':
-            price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+            BSM_price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
             delta = float(norm.cdf(d1))
             gamma = float(norm.pdf(d1) / (S * sigma * np.sqrt(T)))
             vega = float(S * norm.pdf(d1) * np.sqrt(T))
             rho = float(K * T * np.exp(-r * T) * norm.cdf(d2))
             theta = float((-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T)) - r * K * np.exp(-r * T) * norm.cdf(d2)))
         else: # put
-            price = K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+            BSM_price = K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
             delta = float(norm.cdf(d1) - 1)
             gamma = float(norm.pdf(d1) / (S * sigma * np.sqrt(T)))
             vega = float(S * norm.pdf(d1) * np.sqrt(T))
@@ -119,7 +119,7 @@ def _greeks_calculator(option_type: str, S: float, K: float, T: float, r: float,
             theta = float((-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T)) + r * K * np.exp(-r * T) * norm.cdf(-d2)))
 
         results = {
-            "price": float(price),
+            "BSM_price": float(BSM_price),
             "delta": delta,
             "gamma": gamma,
             "vega": vega,
@@ -160,7 +160,7 @@ def calculate_greeks_to_file(input_path: str, output_dir: str = "./output") -> s
             return res
         
         expanded = df.apply(calc_row, axis=1).apply(pd.Series)
-        result_cols = ['price','delta','gamma','vega','rho','theta','error']
+        result_cols = ['BSM_price','delta','gamma','vega','rho','theta','error']
         for col in result_cols:
             if col not in expanded:
                 expanded[col] = pd.NA
