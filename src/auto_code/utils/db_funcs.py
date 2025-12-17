@@ -10,7 +10,7 @@ class SQLiteDB:
         self.conn = sqlite3.connect(self.db_path, isolation_level=None, detect_types=sqlite3.PARSE_DECLTYPES)
         self.conn.row_factory = sqlite3.Row
         self._ensure_pragmas()
-        # self.initialize_schema()
+        self.initialize_schema()
 
     def _ensure_pragmas(self):
         cur = self.conn.cursor()
@@ -45,8 +45,7 @@ class SQLiteDB:
             submitted INTEGER NOT NULL CHECK (submitted IN (0, 1)),
             content TEXT,
             created_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(session_id, version),
-            UNIQUE(file_path)
+            UNIQUE(session_id, version, file_path)
         );
         """)
 
@@ -90,13 +89,16 @@ class SQLiteDB:
         cur.close()
         return sid
 
-
-    def get_session(self, session_id: Optional[int] = None, session_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_session_from_id(self, session_id: int) -> Optional[Dict[str, Any]]:
         cur = self.conn.cursor()
-        if (session_id is not None) and (session_key is None):
-            cur.execute("SELECT * FROM sessions WHERE id = ?", (session_id,))
-        elif (session_id is None) and (session_key is not None):
-            cur.execute("SELECT * FROM sessions WHERE session_key = ?", (session_key,))
+        cur.execute("SELECT * FROM sessions WHERE id = ?", (session_id,))
+        row = cur.fetchone()
+        cur.close()
+        return self._row_to_dict(row)
+
+    def get_session_from_key(self, session_id: Optional[int] = None, session_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM sessions WHERE session_key = ?", (session_key,))
         row = cur.fetchone()
         cur.close()
         return self._row_to_dict(row)
@@ -156,6 +158,15 @@ class SQLiteDB:
             rows.append(d)
         cur.close()
         return rows
+
+    def get_last_code_version(self, session_id: int) -> List[Dict[str, Any]]:
+        cur = self.conn.cursor()
+        sql = "SELECT * FROM code_history WHERE session_id = ? ORDER BY version DESC" + (" LIMIT ?" if limit else "")
+        cur.execute(sql, (session_id,))
+        row = cur.fetchone()
+        d = self._row_to_dict(row)
+        cur.close()
+        return d['version']
 
     # --- Test data locations APIs ---
     def set_test_data_location(self, session_id: int, name: str, path: str, description: Optional[str] = None) -> int:
