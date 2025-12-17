@@ -3,7 +3,7 @@ from bsm_multi_agents.mcp.data_loader import validate_input_file
 from bsm_multi_agents.mcp.pricing_calculator import calculate_bsm_to_file
 from bsm_multi_agents.mcp.pricing_calculator import calculate_greeks_to_file
 from bsm_multi_agents.mcp.pricing_validator import validate_greeks_to_file
-from bsm_multi_agents.mcp.summary_generator import csv_to_summary
+from bsm_multi_agents.mcp.csv_snapshot import csv_to_summary
 
 # Initialize the MCP Server
 mcp = FastMCP("Quant Tools Server")
