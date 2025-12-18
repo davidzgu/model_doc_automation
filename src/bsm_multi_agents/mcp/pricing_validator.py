@@ -127,6 +127,86 @@ def test_gamma_positivity(option_type, S, K, T, r, sigma):
     gamma_condition = price_up + price_down - 2 * base_price
     return gamma_condition > 0
 
+def run_sensitivity_test_to_file(
+    input_path: str, output_dir: str
+) -> str:
+    """
+    Run sensitivity tests for all options in CSV using spot/vol bumps.
+    
+    For each option (first row):
+    - Analyzes spot price sensitivity
+    - Analyzes volatility sensitivity
+    - Tests parallel yield curve shifts
+    
+    Args:
+        input_path: Path to CSV with option parameters
+        output_dir: Directory to save results
+    
+    Returns:
+        JSON string with test results and output file path
+    """
+    try:
+        if not os.path.exists(input_path):
+            return json.dumps({"errors": [f"Input file not found at {input_path}"]})
+        
+        df = pd.read_csv(input_path)
+        if df.empty:
+            return json.dumps({"errors": ["CSV is empty"]})
+        
+        required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
+        missing = [c for c in required_cols if c not in df.columns]
+        if missing:
+            return json.dumps({"errors": [f"Missing columns: {missing}"]})
+        
+        # Use first row as representative option
+        for asset in ['FX', 'Equity', 'Commodity']:
+            for opt_type in ['put', 'call']:
+                row = df[(df['asset_class']==asset)&(df['option_type']==opt_type)].iloc[0].to_dict()
+                option_json = json.dumps({
+                    "asset_class": row.get('asset_class'),
+                    "option_type": row.get('option_type'),
+                    "S": float(row.get('S')),
+                    "K": float(row.get('K')),
+                    "T": float(row.get('T')),
+                    "r": float(row.get('r', 0.0)),
+                    "sigma": float(row.get('sigma'))
+                })
+                
+                # Import and run test
+                from bsm_multi_agents.tools.test_generator_tools import run_sensitivity_test as _run_sens
+                test_result = _run_sens(option_json, output_dir=output_dir)
+                test_data = json.loads(test_result)
+        
+        # Append test summary to results CSV
+        os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.basename(input_path).replace(".csv", "_sensitivity_test_results.csv")
+        output_path = os.path.join(output_dir, filename)
+        
+        summary = {
+            "test_type": "sensitivity",
+            "timestamp": datetime.now().isoformat(),
+            "base_price": test_data.get('base_price'),
+            "delta": test_data.get('base_greeks', {}).get('delta'),
+            "gamma": test_data.get('base_greeks', {}).get('gamma'),
+            "vega": test_data.get('base_greeks', {}).get('vega'),
+            "status": "passed" if test_data.get('success') else "failed",
+            "output_file": test_data.get('output_file', 'N/A')
+        }
+        
+        summary_df = pd.DataFrame([summary])
+        summary_df.to_csv(output_path, index=False)
+        
+        return json.dumps({
+            "success": True,
+            "test_type": "sensitivity",
+            "output_file": os.path.abspath(output_path),
+            "test_details": test_data
+        })
+    
+    except Exception as e:
+        return json.dumps({"errors": [f"Sensitivity test error: {str(e)}"]})
+
+
 def validate_greeks_to_file(
     input_path: str, output_dir: str
 ) -> str:
@@ -195,7 +275,10 @@ def validate_greeks_to_file(
         output_path = os.path.join(output_dir, filename)
         
         df.to_csv(output_path, index=False)
-        
+        filename = os.path.basename(input_path).replace(".csv", "_validate_sensitivity_results.csv")
+        output_path = os.path.join(output_dir, filename)
+        run_sensitivity_test_to_file(input_path, output_path)
+
         return os.path.abspath(output_path)
 
     except Exception as e:

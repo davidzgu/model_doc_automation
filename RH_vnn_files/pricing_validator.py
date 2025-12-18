@@ -166,6 +166,7 @@ def run_sensitivity_test_to_file(
         # Use first row as representative option
         row = df.iloc[0].to_dict()
         option_json = json.dumps({
+            "asset_class": row.get('asset_class'),
             "option_type": row.get('option_type'),
             "S": float(row.get('S')),
             "K": float(row.get('K')),
@@ -181,7 +182,7 @@ def run_sensitivity_test_to_file(
         
         # Append test summary to results CSV
         os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.basename(input_path).replace(".csv", "_sensitivity_test_results.csv")
+        filename = os.path.basename(input_path).replace(".csv", "_sensitivity_test_results")
         output_path = os.path.join(output_dir, filename)
         
         summary = {

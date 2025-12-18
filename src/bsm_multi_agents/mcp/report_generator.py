@@ -16,6 +16,7 @@ def summary_to_word(
     summary_docx_path: str,
     output_docx_path: str = "final_OPA_report.docx",
     pricing_path: str = "./",
+    sen_path: str = "./",
     title: str = "Ongoing Monitoring Analysis Report",
     model_name: str = "Option Pricing, BSM",
     author_name: str = "John Doe",
@@ -304,6 +305,43 @@ def summary_to_word(
             if block:
                 doc.add_paragraph(block)        
        
+        doc.add_heading("2." + str(section_ordering) + ".4 Summary of Sensitivity Positivity Testing for " + asset, level=3)
+        sensitivity_path_call = pd.read_csv(sen_path+"/sensitivity_test_"+asset+"_call.csv")
+        sensitivity_path_put = pd.read_csv(sen_path+"/sensitivity_test_"+asset+"_put.csv")
+        system_prompt = (
+            "Please summmarize the Sensitivity Testing results from the tables provided."
+            "You will need to focus on the following test impact: "
+            "1. Spot price changes (percentage bumps)"
+            "2. Volatility changes (absolute bumps)"
+            "3. Implied vol curve shifts"
+        )
+
+        user_prompt = (
+            "Here is the raw testing result tables that should become the option pricing output sensitivity testing summary section."
+            "The title should have this asset class name."
+            "Each option type (call and put) should have individual paragraph."
+            "Three focus impact should be in bullet points formatting"
+            "Please refine it as described:\n\n"
+            f"{sensitivity_path_call}"
+            f"{sensitivity_path_put}"
+        )
+
+        # Using chat.completions; you can swap to Responses API if you prefer
+        completion = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+        )
+        refined_summary1 = completion.choices[0].message.content.strip() 
+        for block in refined_summary1.split("\n\n"):
+            block = block.strip()
+            if block:
+                doc.add_paragraph(block) 
+
+
 
         # # Create table (rows = data + header)
         # table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
