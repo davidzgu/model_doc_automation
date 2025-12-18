@@ -91,6 +91,20 @@ def print_resp(resp):
     print(resp["messages"][-1].content)
 
 
+def load_local_tools_from_folder(folder_path: str) -> List[StructuredTool]:
+    """
+    Load LangChain StructuredTools from a local folder.
+    All functions in each file under the folder are converted into tools.
+    """
+    tools = []
+    if folder_path is None:
+        return tools
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith(".py") and file_name[0] not in "._":
+            file_path = os.path.join(folder_path, file_name)
+            tools.extend(load_local_tools_from_file(file_path))
+    return tools
+
 def load_local_tools_from_file(file_path: str) -> List[StructuredTool]:
     """
     Load LangChain StructuredTools from a local Python file.
@@ -116,14 +130,13 @@ def load_local_tools_from_file(file_path: str) -> List[StructuredTool]:
     return tools
 
 
-def load_tools_from_mcp_and_local(server_path:str, local_tool_paths:List[str]):
+def load_tools_from_mcp_and_local(server_path:str, local_tool_folder_path:str):
     mcp_tools = list_mcp_tools_sync(server_path)
 
     langchain_tools = [mcp_tool_to_langchain_tool(t, server_path) for t in mcp_tools]
     
-    for path in local_tool_paths:
-        local_tools = load_local_tools_from_file(path)
-        langchain_tools.extend(local_tools)
+    local_tools = load_local_tools_from_folder(local_tool_folder_path)
+    langchain_tools.extend(local_tools)
 
     return langchain_tools
 

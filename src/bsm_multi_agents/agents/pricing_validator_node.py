@@ -35,8 +35,8 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
 
     output_dir = state.get("output_dir")
     
-    local_tool_paths = state.get("local_tool_paths", [])
-    langchain_tools = load_tools_from_mcp_and_local(server_path, local_tool_paths)
+    local_tool_folder_path = state.get("local_tool_folder_path", None)
+    langchain_tools = load_tools_from_mcp_and_local(server_path, local_tool_folder_path)
     
     llm = get_llm().bind_tools(langchain_tools)
     

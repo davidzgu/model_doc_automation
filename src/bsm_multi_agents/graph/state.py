@@ -31,7 +31,7 @@ class WorkflowState(TypedDict, total=False):
     chart_paths: List[str]      # 多张图片路径或目录 
 
     # tool path
-    local_tool_paths: List[str] = []
+    local_tool_folder_path: str
 
     # control flags (由 OrchestratorAgent 决定，可选）
     run_pricing: bool
