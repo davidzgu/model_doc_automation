@@ -1,5 +1,0 @@
-langchain
-pandas
-numpy
-requests
-python-dotenv
