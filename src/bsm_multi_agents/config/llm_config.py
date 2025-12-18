@@ -18,6 +18,7 @@ DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 # WARNING: DO NOT commit your real API key to Git!
 # Instead, set OPENAI_API_KEY environment variable or create a .env file
 DEFAULT_OPENAI_API_KEY = "None"
+
 # ===================================
 
 

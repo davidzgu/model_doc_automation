@@ -2,6 +2,8 @@ from typing import Union, Dict, Any, List, Annotated
 import json
 import pandas as pd
 import os
+import numpy as np
+from scipy.stats import norm
 
 
 def _validate_greeks_rules(
@@ -69,6 +71,61 @@ def _validate_greeks_rules(
     }
     return results
 
+def _black_scholes(option_type, S, K, T, r, sigma):
+    """
+    Calculate the Black-Scholes option price.
+
+    Parameters:
+    option_type (str): 'call' for call option, 'put' for put option
+    S (float): current stock price
+    K (float): option strike price
+    T (float): time to expiration in years
+    r (float): risk-free interest rate (annualized)
+    sigma (float): volatility of the underlying stock (annualized)
+
+    Returns:
+    float: option price
+    """
+    # Calculate d1 and d2
+    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+
+    # Calculate call and put option prices
+    if option_type == 'call':
+        option_price = (S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2))
+    elif option_type == 'put':
+        option_price = (K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1))
+    else:
+        raise ValueError("option_type must be 'call' or 'put'")
+
+    return option_price
+
+def test_gamma_positivity(option_type, S, K, T, r, sigma):
+    """
+    Test the gamma positivity of the Black-Scholes model.
+
+    Parameters:
+    option_type (str): 'call' for call option, 'put' for put option
+    S (float): current stock price
+    K (float): option strike price
+    T (float): time to expiration in years
+    r (float): risk-free interest rate (annualized)
+    sigma (float): volatility of the underlying stock (annualized)
+
+    Returns:
+    bool: True if gamma positivity holds, False otherwise
+    """
+    # Calculate the base price
+    base_price = _black_scholes(option_type, S, K, T, r, sigma)
+
+    # Bump prices up and down by 1%
+    bump = S * 0.01
+    price_up = _black_scholes(option_type, S + bump, K, T, r, sigma)
+    price_down = _black_scholes(option_type, S - bump, K, T, r, sigma)
+
+    # Check gamma positivity condition
+    gamma_condition = price_up + price_down - 2 * base_price
+    return gamma_condition > 0
 
 def validate_greeks_to_file(
     input_path: str, output_dir: str
@@ -114,6 +171,24 @@ def validate_greeks_to_file(
             if col not in expanded:
                 expanded[col] = pd.NA
         df = pd.concat([df, expanded[result_cols]], axis=1)
+
+        # New column
+        df["gamma_positive"] = False
+
+        for idx, row in df.iterrows():
+            option_type = row["option_type"]
+            S = row["S"]
+            K = row["K"]
+            T = row["T"]
+            r = row["r"]
+            sigma = row["sigma"]
+
+            # Run your test
+            gamma_pos = test_gamma_positivity(option_type, S, K, T, r, sigma)
+
+            # Save result
+            df.at[idx, "gamma_positive"] = gamma_pos
+
         # Save to file
         os.makedirs(output_dir, exist_ok=True)
         filename = os.path.basename(input_path).replace(".csv", "_validate_results.csv")
@@ -127,57 +202,3 @@ def validate_greeks_to_file(
         return json.dumps({"errors": [f"Error: {str(e)}"]})
 
 
-def gamma_positivity_test(
-    input_path: str, output_dir: str
-) -> str:
-    """
-    Validate Greeks for ALL options from CSV data.
-
-    For each option:
-    - Validates: price > 0
-    - Validates: delta in [0,1] for calls, [-1,0] for puts
-    - Validates: gamma >= 0, vega >= 0
-
-    Args:
-        state: InjectedState, state from the workflow, which contains csv_data
-
-
-    Returns:
-        JSON string containing validate_results
-    """
-    try:
-        if not os.path.exists(input_path):
-            return f"Error: Input file not found at {input_path}"
-
-        df = pd.read_csv(input_path)
-        required_cols = ['option_type', 'price', 'delta', 'gamma', 'vega']
-        S = self.greeks_calculator.bs_model.S
-        K = self.greeks_calculator.bs_model.K
-        T = self.greeks_calculator.bs_model.T
-        r = self.greeks_calculator.bs_model.r
-        sigma = self.greeks_calculator.bs_model.sigma
-        option_type = self.greeks_calculator.bs_model.option_type
-        initial_greeks = self.greeks_calculator.calculate()
-        initial_price = initial_greeks['price']
-        delta = initial_greeks['delta']
-        gamma = initial_greeks['gamma']
-        greek_based_pnl = delta * price_change + 0.5 * gamma * (price_change ** 2)
-        new_S = S + price_change
-        new_price = self.greeks_calculator.calculate(new_S)['price']
-        revaluation_based_pnl = new_price - initial_price
-        print(f"Initial Price: {initial_price:.2f}")
-        print(f"New Price: {new_price:.2f}")
-        print(f"Greek-based PnL: {greek_based_pnl:.2f}")
-        print(f"Revaluation-based PnL: {revaluation_based_pnl:.2f}")
-        
-        # Save to file
-        os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.basename(input_path).replace(".csv", "_validate_results.csv")
-        output_path = os.path.join(output_dir, filename)
-        
-        df.to_csv(output_path, index=False)
-        
-        return os.path.abspath(output_path)
-
-    except Exception as e:
-        return json.dumps({"errors": [f"Error: {str(e)}"]})

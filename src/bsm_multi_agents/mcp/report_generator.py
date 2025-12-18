@@ -144,17 +144,31 @@ def summary_to_word(
     doc.add_page_break()
 
     # ============================
-    # TABLE OF CONTENTS
+    # TABLE OF CONTENTS (Three Levels)
     # ============================
+
     doc.add_heading("Table of Contents", level=1)
 
-    toc_para = doc.add_paragraph()
-    fld = OxmlElement("w:fldSimple")
-    fld.set(qn("w:instr"), 'TOC \\o "1-3" \\h \\z \\u')
-    toc_para._p.append(fld)
+    # Add a TOC that includes Heading 1, Heading 2, and Heading 3
+    toc_paragraph = doc.add_paragraph()
 
+    # Create the TOC XML field
+    toc_field = OxmlElement("w:fldSimple")
+    toc_field.set(
+        qn("w:instr"),
+        'TOC \\o "1-3" \\h \\z \\u'  
+        # \o "1-3" → include Heading levels 1 to 3
+        # \h       → hyperlink each entry
+        # \z       → hide page numbers in web preview (but visible in Word)
+        # \u       → use applied outline levels
+    )
+
+    # Insert the TOC field into the paragraph
+    toc_paragraph._p.append(toc_field)
+
+    # Page break after TOC
     doc.add_page_break()
-
+    
     # ============================
     # SECTION 1
     # ============================
@@ -180,8 +194,11 @@ def summary_to_word(
     #     reader = csv.reader(f)
     #     rows = list(reader)
     df_pricing = pd.read_csv(pricing_path)
-
+    section_ordering = 0
     for asset in ["FX", "Equity", "Commodity"]:
+        section_ordering+=1
+        doc.add_heading("2." + str(section_ordering) + " Summary of Analysis for " + asset, level=2)
+        doc.add_heading("2." + str(section_ordering) + ".1 Summary of Pricing for " + asset, level=3)
         doc.add_paragraph("The pricing output of "+asset+ " listed in the below table,")
         df = df_pricing[df_pricing["asset_class"] == asset]
         df = df.sort_values("T")
@@ -248,22 +265,60 @@ def summary_to_word(
 
 
         # Insert figure
+        doc.add_heading("2." + str(section_ordering) + ".2 Visualization of Pricing for " + asset, level=3)
         doc.add_picture(img_stream, width=Inches(6.5))
 
-        # Create table (rows = data + header)
-        table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
-        table.style = "Table Grid"
+        doc.add_heading("2." + str(section_ordering) + ".3 Summary of Gamma Positivity Testing for " + asset, level=3)
+        system_prompt = (
+            "Please summmarize the gamma positivity results from the tables with only summarizing quantitative statistics and quantitative explanation into two paragraphs."
+            "Also, we have some annotation for you to understand table columns"
+            "Parameters:"
+            "option_type (str): 'call' for call option, 'put' for put option"
+            "S (float): current stock price"
+            "K (float): option strike price"
+            "T (float): time to expiration in years"
+            "r (float): risk-free interest rate (annualized)"
+            "sigma (float): volatility of the underlying stock (annualized)"
+            "gamma_positive: True if gamma positivity holds, False otherwise"
+        )
 
-        # Header row
-        for col_idx, col_name in enumerate(df.columns):
-            cell = table.rows[0].cells[col_idx]
-            cell.text = str(col_name)
-            cell.paragraphs[0].runs[0].bold = True
+        user_prompt = (
+            "Here is the raw testing result tables that should become the option pricing output gamma positivity testing summary section."
+            "The title should have this asset class name."
+            "Please refine it as described:\n\n"
+            f"{df}"
+        )
 
-        # Data rows
-        for row_idx in range(df.shape[0]):
-            for col_idx in range(df.shape[1]):
-                table.rows[row_idx + 1].cells[col_idx].text = str(df.iat[row_idx, col_idx])
+        # Using chat.completions; you can swap to Responses API if you prefer
+        completion = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+        )
+        refined_summary1 = completion.choices[0].message.content.strip() 
+        for block in refined_summary1.split("\n\n"):
+            block = block.strip()
+            if block:
+                doc.add_paragraph(block)        
+       
+
+        # # Create table (rows = data + header)
+        # table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
+        # table.style = "Table Grid"
+
+        # # Header row
+        # for col_idx, col_name in enumerate(df.columns):
+        #     cell = table.rows[0].cells[col_idx]
+        #     cell.text = str(col_name)
+        #     cell.paragraphs[0].runs[0].bold = True
+
+        # # Data rows
+        # for row_idx in range(df.shape[0]):
+        #     for col_idx in range(df.shape[1]):
+        #         table.rows[row_idx + 1].cells[col_idx].text = str(df.iat[row_idx, col_idx])
 
 
     # Paragraph AFTER table
