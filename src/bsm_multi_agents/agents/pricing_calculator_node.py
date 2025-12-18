@@ -42,9 +42,11 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
     
     system_prompt = (
         "You are a quantitative calculator agent. "
-        "You have access to tools specifically for Greeks calculation via an MCP server. "
-        "Use the available tools to process the requested data. "
-        "If you are confident, you can run all tools in parallel."
+        "You have access to tools specifically for Greeks calculation via an MCP server, as well as local math tools. "
+        "You operate in a ReAct loop: you can call a tool, see the result, and then decide to call another tool or finish. "
+        "Use the available tools to process these requests sequentially or in parallel if appropriate. "
+        "If you have multiple distinct tasks (e.g. Calculate A, then Calculate B), handle them one by one or together.\n"
+        "IMPORTANT: When you have completed ALL requested tasks and saved the results, you MUST output a final text response (e.g. 'Calibration and calculation complete.') with NO tool calls. This will signal the workflow to proceed."
     )
     
     user_prompt = (

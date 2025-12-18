@@ -18,52 +18,36 @@ from bsm_multi_agents.agents.report_generator_node import (
 )
 
 
+
 def should_continue_for_pricing_calculator(state):
+    """
+    Router for Pricing Calculator.
+    - If LLM wants to call tools -> Go to Tool Node.
+    - If LLM is done (no tool calls) -> Go to Validator (Next Stage).
+    """
     messages = state["messages"]
-    if not messages:
-        return END
-        
     last_msg = messages[-1]
     
-    # 1. If it's an Agent message (AIMessage) with tool_calls -> Go to Tool
+    # Check if the last message has tool calls
     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
         return "pricing_calculator_tool"
-    
-    # 2. If it's a Tool Execution message (ToolMessage)
-    #    Check for errors to decide if we should retry
-    if isinstance(last_msg, ToolMessage):
-         if last_msg.content.startswith("Error"):
-             # OPTIONAL: Check iteration count to prevent infinite loop
-             return "pricing_calculator_agent"
-         
-         # Success -> Finish
-         return "pricing_validator_agent"
-    
-    # Default
+        
+    # No tool calls -> Finished this stage
     return "pricing_validator_agent"
 
+
 def should_continue_for_pricing_validator(state):
+    """
+    Router for Pricing Validator.
+    - If LLM wants to call tools -> Go to Tool Node.
+    - If LLM is done (no tool calls) -> Go to Report Generator (Next Stage).
+    """
     messages = state["messages"]
-    if not messages:
-        return END
-        
     last_msg = messages[-1]
     
-    # 1. If it's an Agent message (AIMessage) with tool_calls -> Go to Tool
     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
         return "pricing_validator_tool"
-    
-    # 2. If it's a Tool Execution message (ToolMessage)
-    #    Check for errors to decide if we should retry
-    if isinstance(last_msg, ToolMessage):
-         if last_msg.content.startswith("Error"):
-             # OPTIONAL: Check iteration count to prevent infinite loop
-             return "pricing_validator_agent"
-         
-         # Success -> Finish
-         return "report_generator_agent"
-    
-    # Default
+        
     return "report_generator_agent"
 
 def build_app():
@@ -77,27 +61,26 @@ def build_app():
     graph.add_node("report_generator_agent", report_generator_agent_node)
 
     graph.add_edge(START, "pricing_calculator_agent")
-    graph.add_edge("pricing_calculator_agent", "pricing_calculator_tool")
     graph.add_conditional_edges(
-        "pricing_calculator_tool",
+        "pricing_calculator_agent",
         should_continue_for_pricing_calculator,
         {
-            "pricing_calculator_agent": "pricing_calculator_agent", # Retry
-            "pricing_validator_agent": "pricing_validator_agent" # Success
+            "pricing_calculator_tool": "pricing_calculator_tool", 
+            "pricing_validator_agent": "pricing_validator_agent"
         }
     )
-    graph.add_edge("pricing_validator_agent", "pricing_validator_tool")
+    graph.add_edge("pricing_calculator_tool", "pricing_calculator_agent")
     graph.add_conditional_edges(
-        "pricing_validator_tool",
+        "pricing_validator_agent",
         should_continue_for_pricing_validator,
         {
-            "pricing_validator_agent": "pricing_validator_agent", # Retry
-            "report_generator_agent": "report_generator_agent" # Success
+            "pricing_validator_tool": "pricing_validator_tool", 
+            "report_generator_agent": "report_generator_agent"
         }
     )
+    graph.add_edge("pricing_validator_tool", "pricing_validator_agent")
     graph.add_edge("report_generator_agent", END)
 
-    # Persistence for notebooks
     memory = MemorySaver()
     app = graph.compile(checkpointer=memory)
 

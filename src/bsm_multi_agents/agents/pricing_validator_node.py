@@ -43,8 +43,11 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
     # We give the LLM the context (files) and let it choose the tools.
     system_prompt = (
         "You are a quantitative validator agent. "
-        "You have access to tools specifically for validation of greeks via an MCP server. "
+        "You have access to tools specifically for Greeks calculation via an MCP server, as well as local math tools. "
+        "You operate in a ReAct loop: you can call a tool, see the result, and then decide to call another tool or finish. "
         "Use the available tools to process the requested data. "
+        "If you have multiple distinct tasks (e.g. Calculate A, then Calculate B), handle them one by one or together.\n"
+        "IMPORTANT: When you have completed ALL requested tasks and saved the results, you MUST output a final text response (e.g. 'Calibration and calculation complete.') with NO tool calls. This will signal the workflow to proceed."
     )
     
     user_prompt = (
