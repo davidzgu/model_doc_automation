@@ -69,9 +69,16 @@ class DockerSandbox:
         image: str = DEFAULT_IMAGE,
         timeout_seconds: int = 30,
         memory_limit: str = "256m",
-        enable_network: bool = False
+        enable_network: bool = False,
+        preinstall_packages: Optional[List[str]] = None,
     ):
-        self.image = image
+        # base image the user requested (e.g. "python:3.11-slim")
+        self.base_image = image
+        # if preinstall_packages provided, we'll build a derived image tag
+        self.preinstall_packages = preinstall_packages or []
+        self.image = (
+            f"{self.base_image}-with-pkgs" if self.preinstall_packages else self.base_image
+        )
         self.timeout_seconds = timeout_seconds
         self.memory_limit = memory_limit
         self.enable_network = enable_network
@@ -83,12 +90,28 @@ class DockerSandbox:
             raise RuntimeError(f"Docker not available: {e}")
     
     def _ensure_image(self):
-        """Ensure the Docker image is available."""
-        try:
-            self.client.images.get(self.image)
-        except docker.errors.ImageNotFound:
-            print(f"Pulling image {self.image}...")
-            self.client.images.pull(self.image)
+            """Ensure the Docker image is available. If preinstall_packages is set, build a derived image."""
+            try:
+                self.client.images.get(self.image)
+            except docker.errors.ImageNotFound:
+                if self.preinstall_packages:
+                    print(f"Building image {self.image} from {self.base_image} with packages {self.preinstall_packages}...")
+                    temp_dir = tempfile.mkdtemp()
+                    try:
+                        dockerfile = (
+                            f"FROM {self.base_image}\n"
+                            "ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1\n"
+                            "RUN pip install --no-cache-dir " + " ".join(self.preinstall_packages) + "\n"
+                        )
+                        with open(os.path.join(temp_dir, "Dockerfile"), "w", encoding="utf-8") as df:
+                            df.write(dockerfile)
+                        # build the image and tag it as self.image
+                        self.client.images.build(path=temp_dir, tag=self.image, rm=True, pull=True)
+                    finally:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                else:
+                    print(f"Pulling image {self.base_image}...")
+                    self.client.images.pull(self.base_image)
     
     def _create_execution_script(
         self, 

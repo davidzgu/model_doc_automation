@@ -96,7 +96,9 @@ class code_generator:
         # Initialize chat model (ensure OPENAI_API_KEY is set in env)
         llm = ChatOpenAI(model="gpt-4o-mini", api_key=api_key, temperature=0)
 
-        messages = [("system", self.SYSTEM_PROMPT), MessagesPlaceholder("history")] + prompt
+        messages = [("system", self.SYSTEM_PROMPT), 
+                    MessagesPlaceholder("history")]
+        messages += prompt
 
         prompt_template = ChatPromptTemplate.from_messages(messages)
 

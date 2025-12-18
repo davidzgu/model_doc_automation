@@ -1,13 +1,34 @@
 from auto_code.utils import db_funcs
 from auto_code.code_bot import code_generator
 from typing import Any, Dict, List
+from pathlib import Path
+import pandas as pd
+from auto_code.docker_sandbox import ExecutionResult, ExecutionStatus, DockerSandbox
 
 class ChatSession:
-    def __init__(self, db:db_funcs.SQLiteDB, code_bot, sandbox, session_id:int=None):
+    def __init__(self, db:db_funcs.SQLiteDB, code_bot:code_generator, sandbox:DockerSandbox, test_name:str, description:str=None):
         self.db = db
         self.code_bot = code_bot
         self.sandbox = sandbox
-        self.session_id = session_id
+        self.test_name = test_name
+        # Set up session in db
+        print("<sys>: Fetching the existing session")
+        existing_session = self.db.get_session_from_key(session_key=test_name)
+        if existing_session is None:
+            print("No session found")
+            new_session_id = self.db.create_session(session_key=test_name, description=description)
+            self.session_id = new_session_id
+            self.code_bot.reset_bot(new_session_id)
+            print(f"Session ID: {self.session_id}")
+        else:
+            print(existing_session)
+            self.session_id = existing_session['id']
+        # Path info for code
+        self.BASE_DIR = Path(__file__).resolve().parent
+        self.code_name = f"{self.test_name}_code.py"
+        
+    def get_session_id(self) -> int:
+        return self.session_id
     
     def save_conversation(self, new_chats:List[Dict[str, str]]):
         """
@@ -17,7 +38,7 @@ class ChatSession:
         :param new_chats: Description
         :type new_chats: List[Dict[str, str]]
         """
-        print("Saving new conversations")
+        print("<sys>: Saving new conversations")
         for msg in new_chats:
             role = msg.get('role', 'human')
             content = msg.get('content', '')
@@ -34,30 +55,12 @@ class ChatSession:
             content = msg.get('content', '')
             print(f"{role}: \n{content}\n")
 
-    def upload_test_data(session_id:int, test_name:str, target_path:str, description:str=None):
+
+    def upload_test_data(self, test_file_path:str, description:str=None):
         # register the test data into db
         # return test cases
-        db = db_funcs.SQLiteDB("src/auto_code/db_tables/code_generator.db")
-        db.set_test_data_location(session_id, test_name, target_path, description)
+        self.db.set_test_data_location(self.session_id, self.test_name, test_file_path, description)
         pass
-
-    def fetch_test_data(session_id:int):
-        pass
-
-
-    def initialize_session(self, test_name:str, description:str=None) -> int:
-        print("Fetching the existing session")
-        existing_session = self.db.get_session_from_key(session_key=test_name)
-        if existing_session is None:
-            print("No session found")
-            new_session_id = self.db.create_session(session_key=test_name, description=description)
-            self.session_id = new_session_id
-            self.code_bot.reset_bot(new_session_id)
-            print(f"Session ID: {self.session_id}")
-        else:
-            print(existing_session)
-            self.session_id = existing_session['id']
-        return self.session_id
 
 
     def chat_with_bot(self, human_message:str, human_code:str=None):
@@ -75,48 +78,135 @@ class ChatSession:
         self.save_conversation(messages_to_db)
         # Talk to AI
         ai_code = self.code_bot.generate_code_through_ai(message_to_bot, chat_history)
-        # recrods AI output
+        # recrods AI output into chat history
         self.save_conversation([{'role':'ai', 'content':ai_code}])
-
-
+        # recrods AI code into code repo
+        print("<sys>: Saving Code")
+        self.db.add_code_entry(self.session_id, self.code_name, ai_code)
         return ai_code
     
     def update_code(self, human_code:str):
         one_record = [{'role':'human', 'content': f"User made editions to the previous code, and the new code from user is:\n{human_code}"}]
         self.save_conversation(one_record)
+        self.db.add_code_entry(self.session_id, self.code_name, human_code)
 
-    # def update_code(session_id:int, human_code:str):
-    #     # update the code and record in db
-    #     # update the chat history in db
-    #     code_bot = code_generator(session_id)
-    #     code_bot.update_code_only(human_code)
+    
+    def fetch_test_data(self):
+        test_data_file_info = self.db.get_test_data_locations(self.session_id)
+        test_data_file_path = test_data_file_info['file_path']
+        test_data_df = pd.read_csv(test_data_file_path)
+        test_inputs = test_data_df.to_dict("records")
+        return test_inputs
 
-    def exectue_code():
-        pass
+    def exectue_code(self):
+        # Save code into local
+        current_code_info = self.db.get_last_code_version(self.session_id, self.code_name)
+        current_code = current_code_info['content']
+        code_path = self.BASE_DIR/"code_storage"/self.code_name
+        code_path.parent.mkdir(parents=True, exist_ok=True)
+        code_path.write_text(current_code, encoding="utf-8")
+        code_path_str = str(code_path)
+        print("<sys>: \nFound test code, saved at: ", code_path)
 
-    def submit_code():
+        # Get test inputs
+        test_inputs = self.fetch_test_data()
+        print("<sys>: \nFound test data: ", test_inputs)
+
+        # Run each test cases and get results
+        test_results = []
+        all_passed = True
+        for i, one_input in enumerate(test_inputs):
+            print('-'*60)
+            print(f"<sys>: \nTesting case {i+1}: {one_input}")
+            
+            # Use sandbox as a tool to test the code
+            if isinstance(one_input, dict):
+                result = self.sandbox.test_code(current_code, **one_input)
+            else:
+                result = self.sandbox.test_code(current_code, *one_input)
+            
+            test_results.append({
+                'test_case': i + 1,
+                'input': one_input,
+                'output': result.output,
+                'passed': result.status == ExecutionStatus.SUCCESS,
+                'sandbox_summary_str': result.get_feedback()
+            })
+
+            if result.status != ExecutionStatus.SUCCESS:
+                    all_passed = False
+
+            print(f"<sandboox>: \n{result.get_feedback()}")
+                
+        # return test_results
+
+        # records results into conversation history and code history
+        # Records conversation
+        if all_passed:
+            sandbox_message = [{'role':'human', 'content':'Code exectution sucessfully in the Sandbox.'}]
+        else:
+            test_feedback = "The code failed the tests. Here's what went wrong:\n\n"
+            for result in test_results:
+                if not result['passed']:
+                    test_feedback += f"Test Case {result['test_case']}:\n"
+                    test_feedback += f"  Input: {result['input']}\n"
+                    test_feedback += f"  Output: {result.get('output', 'N/A')}\n"
+                    test_feedback += f"  Sanbox Feedback: {result['sandbox_summary_str']}\n\n"
+            test_feedback += "Please fix the code to pass all test cases."
+            sandbox_message = [{'role':'human', 'content':test_feedback}]
+        self.save_conversation(sandbox_message)
+        # Records output into code history
+
+    def submit_code(self):
+        print("Submitting the Code")
         pass
 
 
 
 
 if __name__ == "__main__":
+    from prompt_toolkit import prompt
+
+
+    # test_data = pd.read_csv(r"D:\ML_Experiment\model_doc_automation\src\auto_code\test_data_storage\dummy_options_greeks_results.csv")
+    # print(test_data)
+
     print("="*60)
     print("Self-Improving Code Generation with Docker Sandbox")
     print("="*60)
 
-    test_name = "gamma_test"#input("test name: ")
+    test_name = "greeks_test"#input("test name: ")
     desc = "some"#input("test descriptions: ")
     db_connection = db_funcs.SQLiteDB("src/auto_code/db_tables/code_generator.db")
     one_bot = code_generator(db_connection)
-    user_session = ChatSession(db_connection, one_bot, None, None)
-    sid = user_session.initialize_session(test_name, desc)
+    sandbox = DockerSandbox(preinstall_packages=['scipy'])
+    user_session = ChatSession(db_connection, one_bot, sandbox, test_name, desc)
+    user_session.upload_test_data(test_file_path=r"D:\ML_Experiment\model_doc_automation\src\auto_code\test_data_storage\dummy_options_greeks_results.csv", 
+                                  description="The file contains the market data of options, BSM prices and greeks are provided by the pricing model.")
+    sid = user_session.get_session_id()
     user_session.print_chat_history()
-    for rnd in range(5):
 
-        user_input = input("Human:")
-        human_code = input("Please edit ai code:")
+
+    # is_execute = input("Execute?")
+    # if is_execute == 'yes':
+    #     user_session.exectue_code()
+    # user_input = input("Human:")
+    # code = user_session.chat_with_bot(user_input, None)
+    # print(f"ai: \n{code}")
+
+    for rnd in range(5):
+        user_input = input("<Human>:")
+        human_code = code = prompt("Edit code (Ctrl-D to finish or Esc + Enter for Windows):\n", multiline=True)
         if human_code == '':
             human_code = None
         code = user_session.chat_with_bot(user_input, human_code)
-        print(f"AI: \n{code}")
+        print(f"<AI>: \n{code}")
+        is_execute = input("Execute?")
+        if is_execute == 'yes':
+            user_session.exectue_code()
+        else:
+            continue
+        approve = input(f"<sys>: \n Submit the last version of code [Yes]/[No]?")
+        if approve == 'Yes':
+            user_session.submit_code()
+            break

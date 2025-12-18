@@ -40,12 +40,15 @@ class SQLiteDB:
         CREATE TABLE IF NOT EXISTS code_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-            file_path TEXT NOT NULL,
+            file_name TEXT NOT NULL,
             version INTEGER NOT NULL,
-            submitted INTEGER NOT NULL CHECK (submitted IN (0, 1)),
             content TEXT,
+            is_current INTEGER NOT NULL CHECK (is_current IN (0, 1)),
+            is_approved INTEGER NOT NULL CHECK (is_approved IN (0, 1)),
+            execution_results TEXT,
+            last_executed_at TEXT,
             created_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(session_id, version, file_path)
+            UNIQUE(session_id, version, file_name)
         );
         """)
 
@@ -55,12 +58,12 @@ class SQLiteDB:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
             name TEXT NOT NULL,
-            path TEXT NOT NULL,
+            file_path TEXT NOT NULL,
             description TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             UNIQUE(session_id),
             UNIQUE(name),
-            UNIQUE(path)
+            UNIQUE(file_path)
         );
         """)
         cur.close()
@@ -136,22 +139,81 @@ class SQLiteDB:
 
 
     # --- Code history APIs ---
-    def add_code_entry(self, file_path: str, version: int, content: str, submitted: Optional[bool] = False,
-                        metadata: Optional[Dict[str, Any]] = None, session_id: Optional[int] = None) -> int:
-        submitted_to_db = 1 if submitted else 0
+    def add_code_entry(self, session_id: int, file_name: str, content: str) -> int:
         cur = self.conn.cursor()
         cur.execute("""
-            INSERT INTO code_history(session_id, file_path, version, submitted, content)
-            VALUES (?, ?, ?, ?, ?)
-        """, (session_id, file_path, version, submitted_to_db, content))
+            UPDATE code_history
+            SET is_current = 0
+            WHERE session_id = ?
+              AND file_name = ?
+              AND is_current = 1
+        """, (session_id, file_name))
+
+        # insert new version
+        cur.execute("""
+            INSERT INTO code_history (
+                session_id, file_name, version,
+                content, is_current, is_approved
+            )
+            SELECT ?, ?, COALESCE(MAX(version), 0) + 1,
+                   ?, 1, 0
+            FROM code_history
+            WHERE session_id = ? AND file_name = ?
+        """, (session_id, file_name, content, session_id, file_name))
         entry_id = cur.lastrowid
         cur.close()
         return entry_id
 
-    def get_code_recent_history(self, session_id: int, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def record_code_execution(self, session_id:int, file_name:str, execution_results:str):
         cur = self.conn.cursor()
-        sql = "SELECT * FROM code_history WHERE session_id = ? ORDER BY version DESC" + (" LIMIT ?" if limit else "")
-        cur.execute(sql, (session_id, limit) if limit else (session_id,))
+        cur.execute("""
+            UPDATE code_history
+            SET execution_results = ?,
+                last_executed_at = datetime('now')
+            WHERE session_id = ?
+            AND file_name = ?
+            AND is_current = 1
+        """, (execution_results, session_id, file_name))
+        entry_id = cur.lastrowid
+        cur.close()
+        return entry_id
+
+    def record_code_approval(self, session_id:int, file_name, version:int):
+        cur = self.conn.cursor()
+        # revoke previous approvals
+        cur.execute("""
+            UPDATE code_history
+            SET is_approved = 0
+            WHERE session_id = ?
+            AND file_name = ?
+            AND is_approved = 1
+        """, (session_id, file_name))
+
+        # approve selected version
+        cur.execute("""
+            UPDATE code_history
+            SET is_approved = 1
+            WHERE session_id = ?
+            AND file_name = ?
+            AND version = ?
+            AND is_current = 1
+        """, (session_id, file_name, version))
+        cur.close()
+
+
+    def get_last_code_version(self, session_id: int, file_name:str) -> Dict[str, Any]:
+        cur = self.conn.cursor()
+        sql = "SELECT * FROM code_history WHERE session_id = ? AND file_name = ? AND is_current = 1 ORDER BY version DESC LIMIT 1" 
+        cur.execute(sql, (session_id, file_name))
+        row = cur.fetchone()
+        d = self._row_to_dict(row)
+        cur.close()
+        return d
+
+    def get_all_versions(self, session_id: int) -> List[Dict[str, Any]]:
+        cur = self.conn.cursor()
+        sql = "SELECT * FROM code_history WHERE session_id = ? ORDER BY version DESC" 
+        cur.execute(sql, (session_id, ))
         rows = []
         for r in cur.fetchall():
             d = self._row_to_dict(r)
@@ -159,33 +221,30 @@ class SQLiteDB:
         cur.close()
         return rows
 
-    def get_last_code_version(self, session_id: int) -> List[Dict[str, Any]]:
-        cur = self.conn.cursor()
-        sql = "SELECT * FROM code_history WHERE session_id = ? ORDER BY version DESC" + (" LIMIT ?" if limit else "")
-        cur.execute(sql, (session_id,))
-        row = cur.fetchone()
-        d = self._row_to_dict(row)
-        cur.close()
-        return d['version']
-
     # --- Test data locations APIs ---
-    def set_test_data_location(self, session_id: int, name: str, path: str, description: Optional[str] = None) -> int:
+    def set_test_data_location(self, session_id: int, name: str, file_path:str, description: Optional[str] = None) -> int:
         cur = self.conn.cursor()
         cur.execute("""
-            INSERT INTO test_data_locations(session_id, name, path, description)
+            INSERT INTO test_data_locations(session_id, name, file_path, description)
             VALUES (?, ?, ?, ?)
-            ON CONFLICT(session_id) DO UPDATE SET name = excluded.name, path=excluded.path, description=excluded.description
-        """, (session_id, name, path, description))
+            ON CONFLICT(session_id)
+            DO UPDATE SET
+                name = excluded.name,
+                file_path = excluded.file_path,
+                description = excluded.description,
+                created_at = datetime('now')
+        """, (session_id, name, file_path, description))
         entry_id = cur.lastrowid
         cur.close()
         return entry_id
 
     def get_test_data_locations(self, session_id: int, ) -> List[Dict[str, Any]]:
         cur = self.conn.cursor()
-        cur.execute("SELECT * FROM test_data_locations WHERE session_id = ? ORDER BY name", (session_id,))
-        rows = [self._row_to_dict(r) for r in cur.fetchall()]
+        cur.execute("SELECT * FROM test_data_locations WHERE session_id = ?", (session_id,))
+        row = cur.fetchone()
+        d =  self._row_to_dict(row)
         cur.close()
-        return rows
+        return d
 
 
 
@@ -195,8 +254,17 @@ if __name__ == "__main__":
     # sid = db.create_session(session_key="greeks_test", description="code_generation_for_greeks_test")
     # sid=1
     # db.add_message(session_id=sid, role='human', content='Please generate another function')
-    fetched_message = db.get_session_messages(1)
-    print(fetched_message)
+    from pathlib import Path
+    # BASE_DIR = Path(__file__).resolve().parent
+    # code_path = str(BASE_DIR/"code_storage"/f"greeks_test_code.py")
+    # # code_path = "D:\ML_Experiment\model_doc_automation\src\auto_code\code_storage\greeks_test_code.py"
+    # print(code_path)
+    # fetched = db.get_last_code_version(1, "greeks_test_code.py")
+    # print(fetched)
+    fetched = db.get_all_versions(1)
+    print(fetched)
+    # fetched_message = db.get_session_messages(1)
+    # print(fetched_message)
     # print(db.get_session(session_key='gamma_test2'))
     # # Convenience function
     # def open_db(path: str) -> SQLiteDB:
