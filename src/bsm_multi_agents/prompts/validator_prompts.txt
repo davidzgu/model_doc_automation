@@ -1,3 +1,0 @@
-Run comprehensive validation tests on ALL options
-- Use the `batch_greeks_validator` tool to validate greeks.
-- The data has been loaded into the state.

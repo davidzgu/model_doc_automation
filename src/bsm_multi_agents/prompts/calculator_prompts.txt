@@ -1,4 +1,0 @@
-Calculate Black-Scholes-Merton option prices and greeks.
-- Load the data from the {csv_file_path}.
-- Use the `calculate_bsm_to_file` tool to calculate prices.
-- Use the `calculate_greeks_to_file` tool to calculate greeks.
