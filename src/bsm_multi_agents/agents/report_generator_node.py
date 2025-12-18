@@ -3,29 +3,31 @@ from typing import Optional
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from openai import OpenAI
-from bsm_multi_agents.config.llm_config import DEFAULT_OPENAI_API_KEY
 import datetime 
-import csv
 import pandas as pd
 from io import BytesIO
 import matplotlib.pyplot as plt
 from docx.shared import Inches
 
-def summary_to_word(
-    summary_docx_path: str,
-    output_docx_path: str = "final_OPA_report.docx",
-    pricing_path: str = "./",
-    title: str = "Ongoing Monitoring Analysis Report",
-    model_name: str = "Option Pricing, BSM",
-    author_name: str = "John Doe",
-    group_name: str = "Front Desk Modeling and Analytics",
-    version: str = "v1.0",
-    section1_heading: str = "1. Introduction",
-    section1_paragraph: Optional[str] = None,
-    section2_heading: str = "2. Testing",
-    section2_paragraph: Optional[str] = None,
-) -> str:
+from langchain_core.messages import SystemMessage, HumanMessage
+from bsm_multi_agents.config.llm_config import get_llm
+from bsm_multi_agents.graph.state import WorkflowState
+
+def report_generator_agent_node(state: WorkflowState) -> WorkflowState:
+    print("\n>>> [Report Generator Agent] Compiling final report...")
+    # summary_docx_path: str,
+    # output_docx_path: str = "final_OPA_report.docx",
+    # pricing_path: str = "./",
+    title: str = "Ongoing Monitoring Analysis Report"
+    model_name: str = "Option Pricing, BSM"
+    author_name: str = "John Doe"
+    group_name: str = "Front Desk Modeling and Analytics"
+    version: str = "v1.0"
+    section1_heading: str = "1. Introduction"
+    section1_paragraph: Optional[str] = None
+    section2_heading: str = "2. Summary of Analysis"
+    # section2_paragraph: Optional[str] = None
+
     """
     Create a formatted Word report with:
     - Title page
@@ -47,58 +49,69 @@ def summary_to_word(
         Absolute path to the generated Word document.
     """
 
-    # --------- 0. Basic checks ---------
-    if not os.path.exists(summary_docx_path):
-        raise FileNotFoundError(f"Summary file not found: {summary_docx_path}")
+    errors = state.get("errors", [])
+    server_path = state.get("server_path")
+    output_dir = state.get("output_dir")
+    validate_results_path = state.get("validate_results_path")
+    final_report_path = state.get("final_report_path")
 
-    api_key = os.getenv("OPENAI_API_KEY", DEFAULT_OPENAI_API_KEY)
-    if not api_key:
-        raise RuntimeError(
-            "OPENAI_API_KEY is not set in the environment. "
-            "Please export it before calling this tool."
-        )
 
-    # --------- 1. Load raw summary text from the source Word file ---------
-    src_doc = Document(summary_docx_path)
-    raw_summary_parts = []
-    for p in src_doc.paragraphs:
-        text = p.text.strip()
-        if text:
-            raw_summary_parts.append(text)
-    raw_summary_text = "\n\n".join(raw_summary_parts).strip()
+    # # --------- 0. Basic checks ---------
+    # if not os.path.exists(summary_docx_path):
+    #     raise FileNotFoundError(f"Summary file not found: {summary_docx_path}")
 
-    if not raw_summary_text:
-        raise ValueError("No non-empty text found in the summary document.")
+    # api_key = os.getenv("OPENAI_API_KEY", DEFAULT_OPENAI_API_KEY)
+    # if not api_key:
+    #     raise RuntimeError(
+    #         "OPENAI_API_KEY is not set in the environment. "
+    #         "Please export it before calling this tool."
+    #     )
 
-    # --------- 2. Refine summary via OpenAI API ---------
-    client = OpenAI(api_key=api_key)
+    # # --------- 1. Load raw summary text from the source Word file ---------
+    # src_doc = Document(summary_docx_path)
+    # raw_summary_parts = []
+    # for p in src_doc.paragraphs:
+    #     text = p.text.strip()
+    #     if text:
+    #         raw_summary_parts.append(text)
+    # raw_summary_text = "\n\n".join(raw_summary_parts).strip()
 
-    system_prompt = (
-        "You are a quantitative finance expert and technical writer. "
-        "Given a rough summary about a quantitative analysis, rewrite it into a clear, "
-        "well-structured Section 2 of a professional report. "
-        "Use concise English, with logical flow and numbered or bulleted lists where helpful. "
-        "Do NOT include a title page or table of contents; only the Section 2 narrative itself."
-    )
+    # if not raw_summary_text:
+    #     raise ValueError("No non-empty text found in the summary document.")
 
-    user_prompt = (
-        "Here is the raw summary text that should become Section 2 of the report. "
-        "Please refine it as described:\n\n"
-        f"{raw_summary_text}"
-    )
+    # # --------- 2. Refine summary via OpenAI API ---------
+    # client = OpenAI(api_key=api_key)
 
-    # Using chat.completions; you can swap to Responses API if you prefer
-    completion = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.3,
-    )
-    refined_summary = completion.choices[0].message.content.strip()
+    # system_prompt = (
+    #     "You are a quantitative finance expert and technical writer. "
+    #     "Given a rough summary about a quantitative analysis, rewrite it into a clear, "
+    #     "well-structured Section 2 of a professional report. "
+    #     "Use concise English, with logical flow and numbered or bulleted lists where helpful. "
+    #     "Do NOT include a title page or table of contents; only the Section 2 narrative itself."
+    # )
+
+    # user_prompt = (
+    #     "Here is the raw summary text that should become Section 2 of the report. "
+    #     "Please refine it as described:\n\n"
+    #     f"{raw_summary_text}"
+    # )
+
+    # # Using chat.completions; you can swap to Responses API if you prefer
+    # completion = client.chat.completions.create(
+    #     model="gpt-4.1-mini",
+    #     messages=[
+    #         {"role": "system", "content": system_prompt},
+    #         {"role": "user", "content": user_prompt},
+    #     ],
+    #     temperature=0.3,
+    # )
+    # refined_summary = completion.choices[0].message.content.strip()
+
+
+    llm = get_llm()
 
     # --------- 3. Create new Word document ---------
+
     doc = Document()
 
     # Title
@@ -171,7 +184,7 @@ def summary_to_word(
     # ============================
     # SECTION 2 – Refined Summary
     # ============================
-    doc.add_heading("2. Summary of Analysis", level=1)
+    doc.add_heading(section2_heading, level=1)
 
     
 
@@ -179,19 +192,19 @@ def summary_to_word(
     # with open(pricing_path, newline="", encoding="utf-8") as f:
     #     reader = csv.reader(f)
     #     rows = list(reader)
-    df_pricing = pd.read_csv(pricing_path)
+    df_validate = pd.read_csv(validate_results_path)
 
     for asset in ["FX", "Equity", "Commodity"]:
         doc.add_paragraph("The pricing output of "+asset+ " listed in the below table,")
-        df = df_pricing[df_pricing["asset_class"] == asset]
+        df = df_validate[df_validate["asset_class"] == asset]
         df = df.sort_values("T")
-        df = df.dropna()
+        # df = df.dropna()
         
         fig, ax = plt.subplots()
         df_call = df[df["option_type"] == "call"]
-        ax.plot(df_call["T"], df_call["BSM_Price"], label = "call")
+        ax.plot(df_call["T"], df_call["BSM_price"], label = "call")
         df_put = df[df["option_type"] == "put"]
-        ax.plot(df_put["T"], df_put["BSM_Price"], label = "put")
+        ax.plot(df_put["T"], df_put["BSM_price"], label = "put")
 
         ax.set_xlabel("Time to Maturity (T)")
         ax.set_ylabel("Option Price (BSM)")
@@ -230,22 +243,28 @@ def summary_to_word(
             f"{df_put}"
         )
 
-        # Using chat.completions; you can swap to Responses API if you prefer
-        completion = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.3,
-        )
-        refined_summary1 = completion.choices[0].message.content.strip() 
+        # # Using chat.completions; you can swap to Responses API if you prefer
+        # completion = client.chat.completions.create(
+        #     model="gpt-4.1-mini",
+        #     messages=[
+        #         {"role": "system", "content": system_prompt},
+        #         {"role": "user", "content": user_prompt},
+        #     ],
+        #     temperature=0.3,
+        # )
+             
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ]
+        ai_msg = llm.invoke(messages)
+        refined_summary1 = ai_msg.content
+        
         for block in refined_summary1.split("\n\n"):
             block = block.strip()
             if block:
-                doc.add_paragraph(block)        
-
-
+                doc.add_paragraph(block)   
 
         # Insert figure
         doc.add_picture(img_stream, width=Inches(6.5))
@@ -266,14 +285,16 @@ def summary_to_word(
                 table.rows[row_idx + 1].cells[col_idx].text = str(df.iat[row_idx, col_idx])
 
 
-    # Paragraph AFTER table
-    # doc.add_paragraph("")    
+    # # Paragraph AFTER table
+    # # doc.add_paragraph("")    
 
-    for block in refined_summary.split("\n\n"):
-        block = block.strip()
-        if block:
-            doc.add_paragraph(block)
+    # for block in refined_summary.split("\n\n"):
+    #     block = block.strip()
+    #     if block:
+    #         doc.add_paragraph(block)
 
     # --------- 4. Save ---------
-    doc.save(output_docx_path)
-    return os.path.abspath(output_docx_path)
+    doc.save(final_report_path)
+    state["errors"] = errors
+    state["final_report_path"] = final_report_path
+    return state

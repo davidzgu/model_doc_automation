@@ -24,11 +24,8 @@ class WorkflowState(TypedDict, total=False):
     # validation artifacts
     validate_results_path: str
 
-    # text artifacts
-    md_summary_text: str        
-    md_summary_path: str       
-    report_plan_text: str       
-    report_path: str      
+    # text artifacts    
+    final_report_path: str      
 
     # charts
     chart_paths: List[str]      # 多张图片路径或目录 
