@@ -126,3 +126,19 @@ def load_tools_from_mcp_and_local(server_path:str, local_tool_paths:List[str]):
         langchain_tools.extend(local_tools)
 
     return langchain_tools
+
+
+def call_local_tool(tool_name: str, args: Dict[str, Any], local_tool_paths: List[str]) -> Any:
+    """
+    Search for a tool in the local tool paths and invoke it.
+    Reuses load_local_tools_from_file to ensure consistency.
+    Raises LookupError if the tool is not found.
+    """
+    for path in local_tool_paths:
+        tools = load_local_tools_from_file(path)
+        for tool in tools:
+            if tool.name == tool_name:
+                # LangChain tool invoke handles argument validation and execution
+                return tool.invoke(args)
+    
+    raise LookupError(f"Tool '{tool_name}' not found in local paths: {local_tool_paths}")

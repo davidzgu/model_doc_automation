@@ -1,9 +1,14 @@
+import os
 from pathlib import Path
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from bsm_multi_agents.graph.state import WorkflowState
 from bsm_multi_agents.config.llm_config import get_llm
 from bsm_multi_agents.agents.mcp_adapter import call_mcp_tool
-from bsm_multi_agents.agents.utils import extract_mcp_content, load_tools_from_mcp_and_local
+from bsm_multi_agents.agents.utils import (
+    extract_mcp_content, 
+    load_tools_from_mcp_and_local, 
+    call_local_tool
+)
 
 
 
@@ -30,6 +35,7 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
     output_dir = state.get("output_dir")
     
     local_tool_paths = state.get("local_tool_paths", [])
+    
     langchain_tools = load_tools_from_mcp_and_local(server_path, local_tool_paths)
     
     llm = get_llm().bind_tools(langchain_tools)
@@ -59,6 +65,7 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
         ai_msg = llm.invoke(messages)
         messages.append(ai_msg)
         state["messages"] = messages
+        print(f"\n>>> [Pricing Calculator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
     except Exception as e:
         errors.append(f"pricing_calculator_agent_node: LLM invocation failed: {e}")
     
@@ -97,12 +104,20 @@ def pricing_calculator_tool_node(state: WorkflowState) -> WorkflowState:
         tool_name = tool_call["name"]
         args = tool_call["args"]
         call_id = tool_call["id"]
-        
+        print(f">>> [Pricing Calculator Tool] Executing tool calls: {tool_name}")
         
         try:
-            # Execute logic
-            raw_result = call_mcp_tool(tool_name, server_path, args)
-            result_text = extract_mcp_content(raw_result)
+            # 1. Try Local Tool First
+            local_tool_paths = state.get("local_tool_paths", [])
+            try:
+                raw_result = call_local_tool(tool_name, args=args, local_tool_paths=local_tool_paths)
+                result_text = str(raw_result)
+            except LookupError:
+                # 2. Fallback to MCP Tool
+                # print(f"Tool {tool_name} not found locally, trying MCP...")
+                raw_result = call_mcp_tool(tool_name, server_path, args)
+                result_text = extract_mcp_content(raw_result)
+
             
             # Create ToolMessage
             tool_outputs_msgs.append(ToolMessage(content=result_text, tool_call_id=call_id, name=tool_name))
