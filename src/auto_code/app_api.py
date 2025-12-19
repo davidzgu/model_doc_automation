@@ -6,7 +6,14 @@ import pandas as pd
 from auto_code.docker_sandbox import ExecutionResult, ExecutionStatus, DockerSandbox
 
 class ChatSession:
-    def __init__(self, db:db_funcs.SQLiteDB, code_bot:code_generator, sandbox:DockerSandbox, test_name:str, description:str=None):
+    def __init__(self,
+                 db:db_funcs.SQLiteDB, 
+                 code_bot:code_generator, 
+                 sandbox:DockerSandbox, 
+                 test_name:str,
+                 test_data_path:str=None,
+                 test_description:str=None,
+                 test_data_description:str=None):
         self.db = db
         self.code_bot = code_bot
         self.sandbox = sandbox
@@ -15,14 +22,23 @@ class ChatSession:
         print("<sys>: Fetching the existing session")
         existing_session = self.db.get_session_from_key(session_key=test_name)
         if existing_session is None:
-            print("No session found")
-            new_session_id = self.db.create_session(session_key=test_name, description=description)
+            print("<sys>: No session found")
+            new_session_id = self.db.create_session(session_key=test_name, description=test_description)
             self.session_id = new_session_id
-            self.code_bot.reset_bot(new_session_id)
-            print(f"Session ID: {self.session_id}")
+            print(f"<sys>: Session ID: {self.session_id}")
+            print("<sys>: Pass test case example to AI prompt")
+            print(test_data_path)
+            self.upload_test_data(test_data_path, test_data_description)
         else:
-            print(existing_session)
+            print("<sys>: \n", existing_session)
             self.session_id = existing_session['id']
+            # Pass the test case exmple to AI
+            print("<sys>: Pass test case example to AI prompt")
+            test_data = self.fetch_test_data()
+            first_test_data = test_data[0]
+            test_example_str = ", ".join(f"{k}={v}" for k, v in first_test_data.items())
+            self.code_bot.insert_test_input(test_example_str, test_data_description)
+            
         # Path info for code
         self.BASE_DIR = Path(__file__).resolve().parent
         self.code_name = f"{self.test_name}_code.py"
@@ -53,13 +69,19 @@ class ChatSession:
         for msg in history_dict:
             role = msg.get('role', 'human')
             content = msg.get('content', '')
-            print(f"{role}: \n{content}\n")
+            print(f"<{role}>: \n{content}\n")
 
 
     def upload_test_data(self, test_file_path:str, description:str=None):
         # register the test data into db
-        # return test cases
+        print("<sys>: Uploading test cases")
         self.db.set_test_data_location(self.session_id, self.test_name, test_file_path, description)
+        # Pass the test case exmple to AI
+        print("<sys>: Pass test case example to AI prompt")
+        test_data = self.fetch_test_data()
+        first_test_data = test_data[0]
+        test_example_str = ", ".join(f"{k}={v}" for k, v in first_test_data.items())
+        self.code_bot.insert_test_input(test_example_str, description)
         pass
 
 
@@ -157,6 +179,7 @@ class ChatSession:
         self.save_conversation(sandbox_message)
         # Records output into code history
 
+
     def submit_code(self):
         print("Submitting the Code")
         pass
@@ -177,32 +200,26 @@ if __name__ == "__main__":
 
     test_name = "greeks_test"#input("test name: ")
     desc = "some"#input("test descriptions: ")
+    test_file_path=r"D:\ML_Experiment\model_doc_automation\src\auto_code\test_data_storage\dummy_options_greeks_results.csv" 
+    test_data_description="The file contains the market data of options, BSM prices and greeks are provided by the pricing model."
+    # Initialize
     db_connection = db_funcs.SQLiteDB("src/auto_code/db_tables/code_generator.db")
-    one_bot = code_generator(db_connection)
+    one_bot = code_generator()
     sandbox = DockerSandbox(preinstall_packages=['scipy'])
-    user_session = ChatSession(db_connection, one_bot, sandbox, test_name, desc)
-    user_session.upload_test_data(test_file_path=r"D:\ML_Experiment\model_doc_automation\src\auto_code\test_data_storage\dummy_options_greeks_results.csv", 
-                                  description="The file contains the market data of options, BSM prices and greeks are provided by the pricing model.")
-    sid = user_session.get_session_id()
+    user_session = ChatSession(db_connection, one_bot, sandbox, test_name, test_file_path, desc, test_data_description)
+    # sid = user_session.get_session_id()
     user_session.print_chat_history()
 
 
-    # is_execute = input("Execute?")
-    # if is_execute == 'yes':
-    #     user_session.exectue_code()
-    # user_input = input("Human:")
-    # code = user_session.chat_with_bot(user_input, None)
-    # print(f"ai: \n{code}")
-
-    for rnd in range(5):
+    while True:
         user_input = input("<Human>:")
         human_code = code = prompt("Edit code (Ctrl-D to finish or Esc + Enter for Windows):\n", multiline=True)
         if human_code == '':
             human_code = None
         code = user_session.chat_with_bot(user_input, human_code)
         print(f"<AI>: \n{code}")
-        is_execute = input("Execute?")
-        if is_execute == 'yes':
+        is_execute = input("Execute [Yes]/[No]?")
+        if is_execute == 'Yes':
             user_session.exectue_code()
         else:
             continue
