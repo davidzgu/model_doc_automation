@@ -3,6 +3,7 @@ from auto_code.code_bot import code_generator
 from typing import Any, Dict, List
 from pathlib import Path
 import pandas as pd
+import json
 from auto_code.docker_sandbox import ExecutionResult, ExecutionStatus, DockerSandbox
 
 class ChatSession:
@@ -122,12 +123,11 @@ class ChatSession:
 
     def exectue_code(self):
         # Save code into local
-        current_code_info = self.db.get_last_code_version(self.session_id, self.code_name)
+        current_code_info = self.db.get_current_version_code(self.session_id, self.code_name)
         current_code = current_code_info['content']
         code_path = self.BASE_DIR/"code_storage"/self.code_name
         code_path.parent.mkdir(parents=True, exist_ok=True)
         code_path.write_text(current_code, encoding="utf-8")
-        code_path_str = str(code_path)
         print("<sys>: \nFound test code, saved at: ", code_path)
 
         # Get test inputs
@@ -178,12 +178,22 @@ class ChatSession:
             sandbox_message = [{'role':'human', 'content':test_feedback}]
         self.save_conversation(sandbox_message)
         # Records output into code history
-
+        test_results_json = json.dumps(test_results)
+        self.db.record_code_execution(self.session_id, self.code_name, test_results_json)
 
     def submit_code(self):
-        print("Submitting the Code")
-        pass
-
+        current_code_info = self.db.get_current_version_code(self.session_id, self.code_name)
+        current_code = current_code_info['content']
+        current_code_version = current_code_info['version']
+        # Record the approval in db
+        print("<sys>: Recording appoval for current code version")
+        self.db.record_code_approval(self.session_id, self.code_name, current_code_version)
+        # Save the current code into the tool file
+        code_path = self.BASE_DIR/"../bsm_multi_agents/tools"/self.code_name
+        code_path.parent.mkdir(parents=True, exist_ok=True)
+        code_path.write_text(current_code, encoding="utf-8")
+        print("<sys>: Saved current code into tool folder")
+        
 
 
 

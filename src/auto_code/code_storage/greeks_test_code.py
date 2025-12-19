@@ -1,10 +1,10 @@
 def validate_greeks(date: str, S: float, K: float, T: float, r: float, sigma: float, option_type: str, asset_class: str, price: float, delta: float, gamma: float, vega: float, rho: float, theta: float, error: float) -> bool:
     """
-    Validate the computed Greek letters for an option based on the Black-Scholes-Merton model.
+    Validate the computed Greek letters for an option based on the Black-Scholes model.
 
     Parameters:
     date (str): The date of the option pricing.
-    S (float): The current stock price.
+    S (float): The current price of the underlying asset.
     K (float): The strike price of the option.
     T (float): The time to expiration in years.
     r (float): The risk-free interest rate.
@@ -24,39 +24,26 @@ def validate_greeks(date: str, S: float, K: float, T: float, r: float, sigma: fl
     """
     if option_type not in ['call', 'put']:
         return False
-    
+
     if asset_class not in ['FX', 'Equity']:
         return False
-    
+
     if error != error:  # Check for NaN
         return False
-    
-    # Validate delta
-    if option_type == 'call':
-        if not (0 <= delta <= 1):
-            return False
-    else:  # put option
-        if not (-1 <= delta <= 0):
-            return False
-    
-    # Validate gamma
+
+    if delta < 0 or delta > 1:
+        return False
+
     if gamma < 0:
         return False
-    
-    # Validate vega
+
     if vega < 0:
         return False
-    
-    # Validate rho
-    if option_type == 'call':
-        if rho < 0:
-            return False
-    else:  # put option
-        if rho > 0:
-            return False
-    
-    # Validate theta
-    if theta > 0:
+
+    if rho < 0:
         return False
-    
+
+    if theta > 0:  # Theta should be negative for long options
+        return False
+
     return True

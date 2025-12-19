@@ -201,7 +201,7 @@ class SQLiteDB:
         cur.close()
 
 
-    def get_last_code_version(self, session_id: int, file_name:str) -> Dict[str, Any]:
+    def get_current_version_code(self, session_id: int, file_name:str) -> Dict[str, Any]:
         cur = self.conn.cursor()
         sql = "SELECT * FROM code_history WHERE session_id = ? AND file_name = ? AND is_current = 1 ORDER BY version DESC LIMIT 1" 
         cur.execute(sql, (session_id, file_name))
@@ -259,7 +259,7 @@ if __name__ == "__main__":
     # code_path = str(BASE_DIR/"code_storage"/f"greeks_test_code.py")
     # # code_path = "D:\ML_Experiment\model_doc_automation\src\auto_code\code_storage\greeks_test_code.py"
     # print(code_path)
-    # fetched = db.get_last_code_version(1, "greeks_test_code.py")
+    # fetched = db.get_current_version_code(1, "greeks_test_code.py")
     # print(fetched)
     fetched = db.get_all_versions(1)
     print(fetched)
