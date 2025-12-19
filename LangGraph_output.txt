@@ -1,0 +1,33 @@
+# Options Analysis Report
+
+### Executive Summary
+This report presents the results of two quantitative tests conducted on the options data extracted from the provided CSV file. The tests performed include the Gamma Positivity Test and the Digital Options Test. All tests passed with positive outcomes, indicating that the option pricing models used are likely functioning within expected parameters. The results suggest robustness in the pricing of both call and put options under varying conditions.
+
+---
+
+### Section 1: Gamma Positivity Test
+The Gamma Positivity Test evaluates whether the Gamma calculated for various options remains positive when subjected to price changes. Here's a summary of the outcomes for each option:
+
+- **Call Option (S: 100, K: 105, T: 1.0, r: 0.05, ��: 0.2)**: Passed
+- **Put Option (S: 102, K: 106, T: 0.9, r: 0.045, ��: 0.19)**: Passed
+- **Call Option (S: 98, K: 104, T: 0.8, r: 0.048, ��: 0.21)**: Passed
+
+### Gamma Positivity Test Results:
+- All options tested yielded a **True** for gamma positivity, confirming that the pricing model exhibits positive Gamma characteristics across the tested parameters.
+
+---
+
+### Section 2: Digital Options Test
+The Digital Options Test assesses the consistency of the pricing for digital options based on the same input parameters. The results for each option are outlined below:
+
+- **Call Option (S: 100, K: 105, T: 1.0, r: 0.05, ��: 0.2)**: Passed
+- **Put Option (S: 102, K: 106, T: 0.9, r: 0.045, ��: 0.19)**: Passed
+- **Call Option (S: 98, K: 104, T: 0.8, r: 0.048, ��: 0.21)**: Passed
+
+### Digital Options Test Results:
+- Every digital option tested resulted in a **True**, indicating consistency in pricing models for the given parameters.
+
+---
+
+### Summary
+The analysis confirms that both the Gamma Positivity and Digital Options tests were successfully passed for all specified option cases. The outcomes reinforce the reliability of the digital option pricing model and its capacity to produce valid Gamma estimations under varying market conditions. These findings are promising for maintaining robust algorithmic trading strategies and further validating the option pricing models utilized.

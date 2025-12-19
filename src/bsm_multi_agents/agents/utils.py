@@ -1,61 +1,43 @@
-from typing import Dict, Any, Iterable
 import asyncio
+import os
+import importlib.util
+import inspect
+from typing import Dict, Any, Iterable, List
 
+from langchain_core.tools import StructuredTool
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 
+from bsm_multi_agents.agents.mcp_adapter import (
+    list_mcp_tools_sync, 
+    mcp_tool_to_langchain_tool
+)
 
+def extract_mcp_content(tool_res) -> str:
+    """Helper to extract text content from MCP CallToolResult"""
+    result_value = None
+    
+    # Try structuredContent["result"]
+    sc = getattr(tool_res, "structuredContent", None)
+    if isinstance(sc, dict) and "result" in sc:
+        result_value = sc["result"]
 
-# def create_mcp_state_tool_wrapper(
-#     *,  # 推荐用 keyword-only，避免顺序错
-#     mcp_tool_name: str,
-#     server_script_path: str,
-#     input_arg_map: Dict[str, str],
-#     output_key: str,
-# ):
-#     """
-#     返回一个函数： state -> state_update
+    # Try TextContent.text
+    if result_value is None:
+        content = getattr(tool_res, "content", None)
+        if content:
+            # content is a list of TextContent or ImageContent
+            texts = []
+            for item in content:
+                if hasattr(item, "text"):
+                    texts.append(item.text)
+            if texts:
+                result_value = "\n".join(texts)
 
-#     - 只从 state 读数据（根据 input_arg_map）
-#     - 调用 MCP 工具 mcp_tool_name
-#     - 把结果写到 {output_key: result} 里返回
-#     """
-
-#     def state_tool(
-#         state: Annotated[dict, InjectedState]
-#     ) -> Dict[str, Any]:
-#         # 1. 从 state 中准备 MCP 调用参数
-#         tool_args = {}
-#         for state_key, mcp_arg_name in input_arg_map.items():
-#             if state_key not in state:
-#                 # 这里直接返回 errors，方便 Agent 看到并决定怎么做
-#                 return {"errors": [f"Missing required state key '{state_key}'"]}
-#             tool_args[mcp_arg_name] = state[state_key]
-
-#         # 2. 调用 MCP（第二层 helper）
-#         try:
-#             result = call_mcp_tool(
-#                 tool_name=mcp_tool_name,
-#                 server_script_path=server_script_path,
-#                 arguments=tool_args,
-#             )
-#         except Exception as e:
-#             return {"errors": [f"MCP call failed: {e}"]}
-
-#         # 3. 处理 MCP 返回结果
-#         if isinstance(result, str) and result.startswith("Error"):
-#             return {"errors": [result]}
-
-#         # 4. 返回 state_update（第三层）
-#         return {output_key: result}
-
-#     return state_tool
-
-
-
-
-
-
-
+    # Fallback
+    if result_value is None:
+        result_value = str(tool_res)
+        
+    return str(result_value)
 
 
 
@@ -107,3 +89,69 @@ def print_resp(resp):
     print(f"Final outputs:")
     print(f"{'='*80}\n")
     print(resp["messages"][-1].content)
+
+
+def load_local_tools_from_folder(folder_path: str) -> List[StructuredTool]:
+    """
+    Load LangChain StructuredTools from a local folder.
+    All functions in each file under the folder are converted into tools.
+    """
+    tools = []
+    if folder_path is None:
+        return tools
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith(".py") and file_name[0] not in "._":
+            file_path = os.path.join(folder_path, file_name)
+            tools.extend(load_local_tools_from_file(file_path))
+    return tools
+
+def load_local_tools_from_file(file_path: str) -> List[StructuredTool]:
+    """
+    Load LangChain StructuredTools from a local Python file.
+    Each function in the file is converted into a tool.
+    """
+    if not os.path.exists(file_path):
+        return []
+
+    module_name = os.path.basename(file_path).replace(".py", "")
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        return []
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    tools = []
+    for name, func in inspect.getmembers(module, inspect.isfunction):
+        # Exclude private functions or imports
+        if not name.startswith("_") and func.__module__ == module_name:
+            tools.append(StructuredTool.from_function(func))
+    
+    return tools
+
+
+def load_tools_from_mcp_and_local(server_path:str, local_tool_folder_path:str):
+    mcp_tools = list_mcp_tools_sync(server_path)
+
+    langchain_tools = [mcp_tool_to_langchain_tool(t, server_path) for t in mcp_tools]
+    
+    local_tools = load_local_tools_from_folder(local_tool_folder_path)
+    langchain_tools.extend(local_tools)
+
+    return langchain_tools
+
+
+def call_local_tool(tool_name: str, args: Dict[str, Any], local_tool_paths: List[str]) -> Any:
+    """
+    Search for a tool in the local tool paths and invoke it.
+    Reuses load_local_tools_from_file to ensure consistency.
+    Raises LookupError if the tool is not found.
+    """
+    for path in local_tool_paths:
+        tools = load_local_tools_from_file(path)
+        for tool in tools:
+            if tool.name == tool_name:
+                # LangChain tool invoke handles argument validation and execution
+                return tool.invoke(args)
+    
+    raise LookupError(f"Tool '{tool_name}' not found in local paths: {local_tool_paths}")
