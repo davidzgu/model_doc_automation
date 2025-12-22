@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 # Set your preferences here (can be overridden by environment variables)
 
 # LLM Provider: "ollama" or "openai"
-DEFAULT_PROVIDER = "ollama"
+DEFAULT_PROVIDER = "openai"
 
 # Ollama settings
 DEFAULT_OLLAMA_MODEL = "qwen3:8b"
