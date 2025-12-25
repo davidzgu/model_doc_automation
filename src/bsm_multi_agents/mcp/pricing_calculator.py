@@ -3,7 +3,7 @@ import os
 import numpy as np
 from scipy.stats import norm
 
-def _bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> float:
+def bsm_calculator(option_type: str, S: float, K: float, T: float, r: float, sigma: float) -> float:
     """
     Calculates the Black-Scholes price for European call or put options.
     """
@@ -39,7 +39,7 @@ def calculate_bsm_to_file(input_path: str, output_dir: str) -> str:
 
         # Calculation Logic
         def calc_row(row):
-            return _bsm_calculator(
+            return bsm_calculator(
                 row['option_type'], 
                 row['S'], 
                 row['K'], 
