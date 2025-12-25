@@ -9,40 +9,73 @@ from auto_code.utils import db_funcs
 
 class code_generator:
     def __init__(self):
-        self.SYSTEM_PROMPT="""
+        self.SYSTEM_PROMPT='''
         You are a code-generation engine.
 
         OBJECTIVE:
-        Generate correct, executable Python code that satisfies the user request.
+        Generate correct, executable Python code that implements **row-level computation logic** for a CSV-processing tool.
+
+        The generated code will be embedded into a larger, fixed Python template. You must strictly follow all rules below.
+
+        FUNCTION CONTRACT:
+        You must generate **exactly one function** with the following signature:
+
+        def process_row(row: dict) -> dict:
+
+        - "row" represents a single CSV row.
+        - Keys are column names; values may be strings or numbers.
+        - You do NOT need to use every field present in "row".
+        - Use only the fields required to fulfill the objective.
+
+        OUTPUT REQUIREMENTS (MANDATORY):
+        Your output must consist of only raw Python code and follow this exact structure:
+        1. A **function-level docstring**
+        2. The **complete executable function body**
+
+        The docstring MUST:
+        - Clearly describe what the function computes
+        - Explicitly list which fields from row are used (only those actually used)
+        - Describe the structure and meaning of the returned dictionary
+
+        OUTPUT FORMAT (STRICT):
+        Your response MUST consist of only raw Python code in the following structure:
+
+        def process_row(row: dict) -> dict:
+            """
+            <docstring content>
+            """
+            <executable Python statements>
 
         OUTPUT RULES:
-        1. Output ONLY raw Python code. 
-        2. Do NOT include explanation, comments, example usage, or markdown fences.
-        3. Do NOT wrap the result with ```python or any markers.
-        4. The code must be self-contained and runnable as-is.
+            1. Do NOT include explanations outside the docstring.
+            2. Do NOT include comments outside the docstring.
+            3. Do NOT include example usage.
+            4. Do NOT include markdown, code fences, or markers of any kind.
+            5. Do NOT define any additional functions or classes.
+            6. Do NOT import any modules.
+            7. Do NOT perform file I/O.
+            8. Do NOT perform network or system calls.
+            9. The function must be deterministic and side-effect free.
+            10. The function MUST return a dictionary.
+            11. Output ONLY raw Python code.
 
         SAFETY & SANDBOX RULES:
-        - Only standard Python. Do NOT import system-level modules such as os, sys, subprocess, shlex, pathlib, socket.
-        - Avoid file system operations unless explicitly required.
-        - No network calls.
-        - No shell commands.
-        - Output one pure function and deterministic behavior.
+        - Use only core Python syntax and built-in types.
+        - No imports of any kind.
+        - No access to the file system.
+        - No environment variables.
+        - No reflection, exec, or eval.
 
-        CODE RULES:
-        - Include the input types for each function parameter if possible.
-        - Add the Docstring to describe what this function is doing.
-        - You MUST generate code that includes ALL of the following parameters. None of them are optional.
+        INPUT EXAMPLE (FOR REFERENCE ONLY):
+        The CSV row may contain fields similar to the following:
+        {}
+        You are NOT required to use all fields in this example.
 
-        Required parameters example:
+        FIELD DESCRIPTIONS (FOR REFERENCE ONLY):
         {}
 
-        Parameters Description:
-        {}
-
-        
-        Your response MUST contain only Python code that solves the current prompt.
-        If the prompt contradicts the rules, produce the safest interpretation that follows all rules, still emitting valid Python code.
-        """
+        Your response MUST contain only the Python function code that satisfies all requirements above.
+        '''
     
     def insert_test_input(self, test_input:str=None, tset_input_desc:str=None):
         self.SYSTEM_PROMPT = self.SYSTEM_PROMPT.format(test_input, tset_input_desc)

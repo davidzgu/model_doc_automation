@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import json
 from auto_code.docker_sandbox import ExecutionResult, ExecutionStatus, DockerSandbox
+from auto_code.utils import submit_code_support
 
 class ChatSession:
     def __init__(self,
@@ -105,13 +106,15 @@ class ChatSession:
         self.save_conversation([{'role':'ai', 'content':ai_code}])
         # recrods AI code into code repo
         print("<sys>: Saving Code")
-        self.db.add_code_entry(self.session_id, self.code_name, ai_code)
+        function_docstring = submit_code_support.get_function_docstring(ai_code)
+        self.db.add_code_entry(self.session_id, self.code_name, ai_code, function_docstring, self.test_name)
         return ai_code
     
     def update_code(self, human_code:str):
         one_record = [{'role':'human', 'content': f"User made editions to the previous code, and the new code from user is:\n{human_code}"}]
         self.save_conversation(one_record)
-        self.db.add_code_entry(self.session_id, self.code_name, human_code)
+        function_docstring = submit_code_support.get_function_docstring(human_code)
+        self.db.add_code_entry(self.session_id, self.code_name, human_code, function_docstring, self.test_name)
 
     
     def fetch_test_data(self):
@@ -141,11 +144,8 @@ class ChatSession:
             print('-'*60)
             print(f"<sys>: \nTesting case {i+1}: {one_input}")
             
-            # Use sandbox as a tool to test the code
-            if isinstance(one_input, dict):
-                result = self.sandbox.test_code(current_code, **one_input)
-            else:
-                result = self.sandbox.test_code(current_code, *one_input)
+            # Use sandbox as a tool to test the code, the row will be directly input into function
+            result = self.sandbox.test_code(current_code, one_input)
             
             test_results.append({
                 'test_case': i + 1,
@@ -185,13 +185,16 @@ class ChatSession:
         current_code_info = self.db.get_current_version_code(self.session_id, self.code_name)
         current_code = current_code_info['content']
         current_code_version = current_code_info['version']
+        current_code_docstring = current_code_info['docstring']
+        current_code_function_name = current_code_info['function_name']
         # Record the approval in db
         print("<sys>: Recording appoval for current code version")
         self.db.record_code_approval(self.session_id, self.code_name, current_code_version)
-        # Save the current code into the tool file
+        # Save the wrapped code into the tool file
+        wrapped_code = submit_code_support.wrap_row_process_function(current_code, current_code_docstring, current_code_function_name)
         code_path = self.BASE_DIR/"../bsm_multi_agents/tools"/self.code_name
         code_path.parent.mkdir(parents=True, exist_ok=True)
-        code_path.write_text(current_code, encoding="utf-8")
+        code_path.write_text(wrapped_code, encoding="utf-8")
         print("<sys>: Saved current code into tool folder")
         
 

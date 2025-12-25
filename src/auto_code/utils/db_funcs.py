@@ -43,6 +43,8 @@ class SQLiteDB:
             file_name TEXT NOT NULL,
             version INTEGER NOT NULL,
             content TEXT,
+            docstring TEXT,
+            function_name TEXT,
             is_current INTEGER NOT NULL CHECK (is_current IN (0, 1)),
             is_approved INTEGER NOT NULL CHECK (is_approved IN (0, 1)),
             execution_results TEXT,
@@ -139,7 +141,7 @@ class SQLiteDB:
 
 
     # --- Code history APIs ---
-    def add_code_entry(self, session_id: int, file_name: str, content: str) -> int:
+    def add_code_entry(self, session_id: int, file_name: str, content: str, docstring:str, function_name:str) -> int:
         cur = self.conn.cursor()
         cur.execute("""
             UPDATE code_history
@@ -153,13 +155,14 @@ class SQLiteDB:
         cur.execute("""
             INSERT INTO code_history (
                 session_id, file_name, version,
-                content, is_current, is_approved
+                content, docstring, function_name,
+                is_current, is_approved
             )
             SELECT ?, ?, COALESCE(MAX(version), 0) + 1,
-                   ?, 1, 0
+                   ?, ?, ?, 1, 0
             FROM code_history
             WHERE session_id = ? AND file_name = ?
-        """, (session_id, file_name, content, session_id, file_name))
+        """, (session_id, file_name, content, docstring, function_name, session_id, file_name))
         entry_id = cur.lastrowid
         cur.close()
         return entry_id

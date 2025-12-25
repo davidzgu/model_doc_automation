@@ -1,0 +1,58 @@
+import json
+import os
+import pandas as pd
+
+
+def <<<CODE_NAME>>>(
+    input_path: str, output_dir: str
+) -> str:
+    """
+    Run test function for given data in CSV.
+
+    Args:
+        input_path: Path to CSV with option parameters
+        output_dir: Directory to save results
+    
+    Returns:
+        JSON string with P&L test results and output file path
+
+    Notes:
+    This function reads the input CSV row by row and applies a
+    row-level function to each record.
+
+    Row-level transformation:
+    <<<PROCESS_ROW_FUNCTION_DOCSTRING>>>
+
+    """
+
+<<<PROCESS_ROW_FUNCTION_CODE>>>
+
+
+    try:
+        if not os.path.exists(input_path):
+            return f"Error: Input file not found at {input_path}"
+
+        df = pd.read_csv(input_path)
+        required_cols = ['option_type', 'BSM_price', 'delta', 'gamma', 'vega']
+        missing = [c for c in required_cols if c not in df.columns]
+        if missing:
+            return json.dumps({"errors": [f"Missing columns: {missing}"]})
+
+        expanded = df.apply(process_row, axis=1).apply(pd.Series)
+        df = pd.concat([df, expanded], axis=1)
+        # Save to file
+        os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.basename(input_path).replace(".csv", "_validate_results.csv")
+        output_path = os.path.join(output_dir, filename)
+        
+        df.to_csv(output_path, index=False)
+        
+        return json.dumps({
+            "success": True,
+            "test_type": "<<<CODE_NAME>>>",
+            "output_file": os.path.abspath(output_path),
+            "test_details": df.to_dict('records')
+        })
+
+    except Exception as e:
+        return json.dumps({"errors": [f"Error: {str(e)}"]})
