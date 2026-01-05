@@ -46,7 +46,11 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
         "You have access to tools specifically for Greeks calculation via an MCP server, as well as local math tools. "
         "You operate in a ReAct loop: you can call a tool, see the result, and then decide to call another tool or finish. "
         "Use the available tools to process the requested data. "
-        "If you have multiple distinct tasks (e.g. Calculate A, then Calculate B), handle them one by one or together.\n"
+        "Your validation process MUST include:\n"
+        "1. **Greek Validation**: Validate ranges for Delta, Gamma, Vega, etc.\n"
+        "2. **Stress Testing**: Run stress tests with market scenarios.\n"
+        "3. **P&L Attribution**: Execute P&L analysis and attribution tests.\n"
+        "If you have multiple distinct tasks, handle them one by one or together.\n"
         "IMPORTANT: When you have completed ALL requested tasks and saved the results, you MUST output a final text response (e.g. 'Calibration and calculation complete.') with NO tool calls. This will signal the workflow to proceed."
     )
     
@@ -54,8 +58,8 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
         f"Input CSV File: {state['greeks_results_path']}\n"
         f"Output Directory: {output_dir}\n\n"
         "Please validate the Greeks for the options in the input CSV file. "
-        "Save the results to the output directory. "
-        "Ensure you call the validation tools."
+        "Additionally, run stress tests and execute P&L attribution tests using the appropriate tools. "
+        "Save all results to the output directory. "
     )
 
     messages = list(state.get("messages", []))

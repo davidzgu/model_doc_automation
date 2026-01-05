@@ -52,7 +52,6 @@ def _bsm_price(
     
     return final_price
 
-
 def _bsm_delta(
     option_type: Union[str, pd.Series],
     S: Union[float, pd.Series],
@@ -77,7 +76,6 @@ def _bsm_delta(
                     np.where(is_call, intrinsic_delta_call, intrinsic_delta_put),
                     np.where(is_call, delta_call, delta_put))
 
-
 def _bsm_gamma(
     S: Union[float, pd.Series],
     K: Union[float, pd.Series],
@@ -91,7 +89,6 @@ def _bsm_gamma(
     gamma = norm.pdf(d1) / (S * sigma * sqrtT)
     return np.where(T <= 0, 0.0, gamma)
 
-
 def _bsm_vega(
     S: Union[float, pd.Series],
     K: Union[float, pd.Series],
@@ -104,7 +101,6 @@ def _bsm_vega(
     d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
     vega = S * norm.pdf(d1) * sqrtT / 100.0
     return np.where(T <= 0, 0.0, vega)
-
 
 def _bsm_theta(
     option_type: Union[str, pd.Series],
@@ -197,7 +193,6 @@ def _validate_greeks_rules(
 # Simple TEST
 # ============================================================================
 
-
 def validate_greeks_to_file(
     input_path: str, output_dir: str
 ) -> str:
@@ -254,7 +249,6 @@ def validate_greeks_to_file(
     except Exception as e:
         return json.dumps({"errors": [f"Error: {str(e)}"]})
 
-
 # ============================================================================
 # SENSITIVITY TEST
 # ============================================================================
@@ -310,7 +304,6 @@ def _run_stress_test(
     results[f"{name}_PnL%"] = pnl_pct
     
     return results
-
 
 def run_stress_test_to_file(
     input_path: str, output_dir: str,
@@ -395,255 +388,190 @@ def run_stress_test_to_file(
     except Exception as e:
         return f"Error: Stress test execution failed: {str(e)}"
 
-
 # ============================================================================
 # P&L ANALYSIS TEST (Wraps run_pnl_test from tools)
 # ============================================================================
 
-def run_pnl_test(
-    option_data: str,
-    market_moves: str,
-    output_dir: str = "outputs/tests"
-) -> str:
+def _calculate_scenario_pnl(
+    row: pd.Series,
+    scenario: Dict[str, float],
+) -> Dict[str, float]:
     """
-    Run P&L analysis and attribution test.
-    
-    Analyzes:
-      - Greeks-based P&L estimate vs. actual P&L
-      - P&L attribution (delta, gamma, vega, theta contributions)
-      - Gamma P&L (realized variance impact)
-      - Hedging effectiveness (delta-hedged returns)
-    
-    Args:
-        option_data: JSON string with initial option parameters
-        market_moves: JSON array of market scenarios
-          Format: [{"spot": X, "vol": X, "days_passed": X, "rate": X}, ...]
-        output_dir: Directory to save results
-    
-    Returns:
-        JSON with P&L analysis results
-    """
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Parse inputs
-        try:
-            option_params = json.loads(option_data)
-        except:
-            option_params = option_data if isinstance(option_data, dict) else {}
-        
-        try:
-            moves = json.loads(market_moves)
-        except:
-            moves = market_moves if isinstance(market_moves, list) else []
-        
-        required_fields = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
-        if not all(field in option_params for field in required_fields):
-            return json.dumps({"error": f"Missing required fields. Need: {required_fields}"})
-        
-        opt_type = option_params['option_type']
-        S0 = float(option_params['S'])
-        K = float(option_params['K'])
-        T0 = float(option_params['T'])
-        r = float(option_params['r'])
-        sigma0 = float(option_params['sigma'])
-        
-        # Base case
-        V0 = _bsm_price(opt_type, S0, K, T0, r, sigma0)
-        delta0 = _bsm_delta(opt_type, S0, K, T0, r, sigma0)
-        gamma0 = _bsm_gamma(S0, K, T0, r, sigma0)
-        vega0 = _bsm_vega(S0, K, T0, r, sigma0)
-        theta0 = _bsm_theta(opt_type, S0, K, T0, r, sigma0)
-        
-        if not moves:
-            # Default market moves for demonstration
-            moves = [
-                {"spot": S0 * 1.01, "vol": sigma0 + 0.01, "days_passed": 1, "rate": r},
-                {"spot": S0 * 0.99, "vol": sigma0 - 0.01, "days_passed": 1, "rate": r},
-                {"spot": S0 * 1.05, "vol": sigma0 + 0.05, "days_passed": 5, "rate": r},
-                {"spot": S0 * 0.95, "vol": sigma0 + 0.03, "days_passed": 5, "rate": r},
-            ]
-        
-        pnl_analysis = []
-        
-        for move in moves:
-            S1 = float(move.get('spot', S0))
-            sigma1 = float(move.get('vol', sigma0))
-            days_passed = float(move.get('days_passed', 0))
-            r1 = float(move.get('rate', r))
-            
-            # Time decay
-            T1 = max(0, T0 - days_passed / 365.0)
-            
-            # New option price
-            V1 = _bsm_price(opt_type, S1, K, T1, r1, sigma1)
-            actual_pnl = V1 - V0
-            
-            # Greeks-based P&L estimate
-            spot_move = S1 - S0
-            vol_move = sigma1 - sigma0
-            rate_move = r1 - r
-            time_decay = days_passed / 365.0
-            
-            # P&L components
-            delta_pnl = delta0 * spot_move
-            gamma_pnl = 0.5 * gamma0 * (spot_move ** 2)
-            vega_pnl = vega0 * vol_move
-            theta_pnl = theta0 * time_decay
-            
-            # Total estimated P&L
-            estimated_pnl = delta_pnl + gamma_pnl + vega_pnl + theta_pnl
-            pnl_error = actual_pnl - estimated_pnl
-            
-            # Realized variance (gamma P&L proxy)
-            realized_var = (spot_move / S0) ** 2 if S0 != 0 else 0
-            
-            # Delta-hedged P&L (excluding delta component)
-            hedged_pnl = gamma_pnl + vega_pnl + theta_pnl
-            
-            pnl_analysis.append({
-                "spot_level": S1,
-                "spot_move": spot_move,
-                "vol_level": sigma1,
-                "vol_move": vol_move,
-                "days_passed": days_passed,
-                "rate_level": r1,
-                "rate_move": rate_move,
-                "base_price": V0,
-                "new_price": V1,
-                "actual_pnl": actual_pnl,
-                "delta_pnl": delta_pnl,
-                "gamma_pnl": gamma_pnl,
-                "vega_pnl": vega_pnl,
-                "theta_pnl": theta_pnl,
-                "estimated_pnl": estimated_pnl,
-                "pnl_error": pnl_error,
-                "realized_variance": realized_var,
-                "delta_hedged_pnl": hedged_pnl
-            })
-        
-        # Save results
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = os.path.join(output_dir, f"pnl_analysis_{timestamp}.csv")
-        
-        analysis_df = pd.DataFrame(pnl_analysis)
-        analysis_df.to_csv(output_file, index=False)
-        
-        # Summary statistics
-        actual_pnls = [p['actual_pnl'] for p in pnl_analysis]
-        estimated_pnls = [p['estimated_pnl'] for p in pnl_analysis]
-        errors = [p['pnl_error'] for p in pnl_analysis]
-        
-        summary = {
-            "num_scenarios": len(pnl_analysis),
-            "avg_actual_pnl": float(np.mean(actual_pnls)),
-            "max_actual_pnl": float(np.max(actual_pnls)),
-            "min_actual_pnl": float(np.min(actual_pnls)),
-            "avg_pnl_error": float(np.mean(errors)),
-            "max_pnl_error": float(np.max(np.abs(errors))),
-            "avg_delta_hedged_pnl": float(np.mean([p['delta_hedged_pnl'] for p in pnl_analysis]))
-        }
-        
-        return json.dumps({
-            "success": True,
-            "base_greeks": {
-                "price": V0,
-                "delta": delta0,
-                "gamma": gamma0,
-                "vega": vega0,
-                "theta": theta0
-            },
-            "pnl_analysis": pnl_analysis,
-            "summary": summary,
-            "output_file": output_file
-        })
-    
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+    Calculate P&L and Greek attribution for a single market scenario.
 
-def run_pnl_test_to_file(
-    input_path: str, output_dir: str
+    Computes the actual P&L (based on BSM pricing) and compares it with
+    the estimated P&L derived from Greeks (Delta, Gamma, Vega, Theta).
+
+    Args:
+        row (pd.Series): A row containing option parameters (S, K, T, r, sigma, option_type).
+        scenario (Dict[str, float]): A dictionary defining the market move (spot_change, vol_change, etc.).
+
+    Returns:
+        Dict[str, float]: A dictionary containing actual P&L, estimated P&L, attribution components, and error metrics.
+    """
+    opt_type = row['option_type']
+    S0 = float(row['S'])
+    K = float(row['K'])
+    T0 = float(row['T'])
+    r = float(row['r'])
+    sigma0 = float(row['sigma'])
+
+    # Base case
+    V0 = _bsm_price(opt_type, S0, K, T0, r, sigma0)
+    delta0 = _bsm_delta(opt_type, S0, K, T0, r, sigma0)
+    gamma0 = _bsm_gamma(S0, K, T0, r, sigma0)
+    vega0 = _bsm_vega(S0, K, T0, r, sigma0)
+    theta0 = _bsm_theta(opt_type, S0, K, T0, r, sigma0)
+
+    scenario_name = scenario.get('name', 'Unknown')
+    spot_change = scenario.get('spot_change', 0.0)
+    vol_change = scenario.get('vol_change', 0.0)
+    days_passed = scenario.get('days_passed', 0.0)
+    rate_change = scenario.get('rate_change', 0.0)
+
+    S1 = S0*(1+spot_change)
+    sigma1 = sigma0*(1+vol_change)
+    T1 = max(0, T0 - days_passed / 365.0)
+    r1 = r*(1+rate_change)
+
+    # New option price
+    V1 = _bsm_price(opt_type, S1, K, T1, r1, sigma1)
+    actual_pnl = V1 - V0
+
+    # Greeks-based P&L estimate
+    spot_move = S1 - S0
+    vol_move = sigma1 - sigma0
+    rate_move = r1 - r
+    time_decay = days_passed / 365.0
+
+    # P&L components
+    delta_pnl = delta0 * spot_move
+    gamma_pnl = 0.5 * gamma0 * (spot_move ** 2)
+    vega_pnl = vega0 * vol_move
+    theta_pnl = theta0 * time_decay
+
+    # Total estimated P&L
+    estimated_pnl = delta_pnl + gamma_pnl + vega_pnl + theta_pnl
+    pnl_error = actual_pnl - estimated_pnl
+
+    # Realized variance (gamma P&L proxy)
+    realized_var = (spot_move / S0) ** 2 if S0 != 0 else 0
+
+    # Delta-hedged P&L (excluding delta component)
+    hedged_pnl = gamma_pnl + vega_pnl + theta_pnl
+
+    result = {
+        "scenario_name": scenario_name,
+        "spot_level": S1,
+        "spot_move": spot_move,
+        "vol_level": sigma1,
+        "vol_move": vol_move,
+        "days_passed": days_passed,
+        "rate_level": r1,
+        "rate_move": rate_move,
+        "base_price": V0,
+        "new_price": V1,
+        "actual_pnl": actual_pnl,
+        "delta_pnl": delta_pnl,
+        "gamma_pnl": gamma_pnl,
+        "vega_pnl": vega_pnl,
+        "theta_pnl": theta_pnl,
+        "estimated_pnl": estimated_pnl,
+        "pnl_error": pnl_error,
+        "realized_variance": realized_var,
+        "delta_hedged_pnl": hedged_pnl
+    }
+
+    return result
+
+def _summarize_pnl_scenarios(
+    row: pd.Series,
+    scenarios: List[Dict] | None = None,
+) -> pd.Series:
+    """
+    Run multiple P&L scenarios for a single option and calculate summary metrics.
+
+    Aggregates results across all provided scenarios to find average/max/min P&L
+    and errors to evaluate pricing model stability or hedging effectiveness.
+
+    Args:
+        row (pd.Series): A row containing option parameters.
+        scenarios (List[Dict] | None): A list of scenario dictionaries. Defaults to global DEFAULT_SCENARIOS.
+
+    Returns:
+        pd.Series: Summary statistics including num_scenarios, avg_actual_pnl, max_pnl_error, etc.
+    """
+    if not scenarios:
+        # Default market moves for demonstration
+        scenarios = DEFAULT_SCENARIOS
+    
+    details = [_calculate_scenario_pnl(row, s) for s in scenarios]
+
+    num_scenarios = len(details)
+    avg_actual_pnl = np.mean([d['actual_pnl'] for d in details])
+    max_actual_pnl = np.max([d['actual_pnl'] for d in details])
+    min_actual_pnl = np.min([d['actual_pnl'] for d in details])
+    avg_pnl_error = np.mean([d['pnl_error'] for d in details])
+    max_pnl_error = np.max(np.abs([d['pnl_error'] for d in details]))
+    avg_delta_hedged_pnl = np.mean([d['delta_hedged_pnl'] for d in details])
+    
+    
+    return pd.Series({
+        'num_scenarios': num_scenarios,
+        'avg_actual_pnl': avg_actual_pnl,
+        'max_actual_pnl': max_actual_pnl,
+        'min_actual_pnl': min_actual_pnl,
+        'avg_pnl_error': avg_pnl_error,
+        'max_pnl_error': max_pnl_error,
+        'avg_delta_hedged_pnl': avg_delta_hedged_pnl,
+        'details': details
+    })
+
+def run_pnl_attribution_test_to_file(
+    input_path: str, 
+    output_dir: str,
+    scenarios: List[Dict] | None = None,
 ) -> str:
     """
-    Run P&L analysis and attribution tests for all options in CSV.
-    
-    For each option (first row):
-    - Analyzes Greeks-based P&L estimates vs. actual P&L
-    - Tests P&L attribution (delta, gamma, vega, theta)
-    - Tests gamma P&L (realized variance impact)
-    - Tests delta-hedged returns
-    
+    Execute P&L attribution tests for all options in a CSV file.
+
+    Reads option data, runs specified scenarios for each option, aggregates results,
+    and saves the detailed analysis to a CSV file.
+
     Args:
-        input_path: Path to CSV with option parameters
-        output_dir: Directory to save results
-    
+        input_path (str): Absolute path to the input CSV file containing option data.
+        output_dir (str): Directory where the output CSV will be saved.
+        scenarios (List[Dict] | None): Optional list of scenarios to test. Defaults to DEFAULT.
+
     Returns:
-        JSON string with P&L test results and output file path
+        str: The absolute path to the generated result file.
     """
     try:
         if not os.path.exists(input_path):
-            return json.dumps({"errors": [f"Input file not found at {input_path}"]})
+            return f"Input file not found at {input_path}"
         
         df = pd.read_csv(input_path)
         if df.empty:
-            return json.dumps({"errors": ["CSV is empty"]})
+            return f"CSV is empty"
         
         required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
-            return json.dumps({"errors": [f"Missing columns: {missing}"]})
+            return f"Missing columns: {missing}"
         
-        # Use first row as representative option
-        row = df.iloc[0].to_dict()
-        option_json = json.dumps({
-            "option_type": row.get('option_type'),
-            "S": float(row.get('S')),
-            "K": float(row.get('K')),
-            "T": float(row.get('T')),
-            "r": float(row.get('r', 0.0)),
-            "sigma": float(row.get('sigma'))
-        })
+        if not scenarios:
+            # Default market moves for demonstration
+            scenarios = DEFAULT_SCENARIOS
         
-        # Default market moves for test
-        moves_json = json.dumps([
-            {"spot": float(row.get('S')) * 1.01, "vol": float(row.get('sigma')) + 0.01, "days_passed": 1, "rate": float(row.get('r', 0.0))},
-            {"spot": float(row.get('S')) * 0.99, "vol": float(row.get('sigma')) - 0.01, "days_passed": 1, "rate": float(row.get('r', 0.0))},
-        ])
+        results = df.apply(lambda r: _summarize_pnl_scenarios(r, scenarios), axis=1)
+        summary_df = pd.concat([df, results], axis=1)
         
-        # Import and run test
-        test_result = run_pnl_test(option_json, moves_json, output_dir=output_dir)
-        test_data = json.loads(test_result)
-        
-        # Append test summary to results CSV
-        os.makedirs(output_dir, exist_ok=True)
         filename = os.path.basename(input_path).replace(".csv", "_pnl_test_results.csv")
         output_path = os.path.join(output_dir, filename)
         
-        summary_stats = test_data.get('summary', {})
-        summary = {
-            "test_type": "pnl_analysis",
-            "timestamp": datetime.now().isoformat(),
-            "base_price": test_data.get('base_greeks', {}).get('BSM_price'),
-            "base_delta": test_data.get('base_greeks', {}).get('delta'),
-            "base_gamma": test_data.get('base_greeks', {}).get('gamma'),
-            "base_vega": test_data.get('base_greeks', {}).get('vega'),
-            "base_theta": test_data.get('base_greeks', {}).get('theta'),
-            "num_scenarios": summary_stats.get('num_scenarios'),
-            "avg_pnl_error": summary_stats.get('avg_pnl_error'),
-            "max_pnl_error": summary_stats.get('max_pnl_error'),
-            "status": "passed" if test_data.get('success') else "failed",
-            "output_file": test_data.get('output_file', 'N/A')
-        }
-        
-        summary_df = pd.DataFrame([summary])
         summary_df.to_csv(output_path, index=False)
         
-        return json.dumps({
-            "success": True,
-            "test_type": "pnl_analysis",
-            "output_file": os.path.abspath(output_path),
-            "test_details": test_data
-        })
+        return os.path.abspath(output_path)
     
     except Exception as e:
-        return json.dumps({"errors": [f"P&L test error: {str(e)}"]})
+        return f"P&L test error: {str(e)}"
