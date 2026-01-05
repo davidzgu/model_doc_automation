@@ -307,7 +307,7 @@ def _run_stress_test(
 
 def run_stress_test_to_file(
     input_path: str, output_dir: str,
-    scenarios: Optional[str] = DEFAULT_SCENARIOS
+    scenarios: List[Dict] = DEFAULT_SCENARIOS
 ) -> str:
     """
     Run stress tests for all options in CSV using extreme market scenarios.
@@ -315,11 +315,11 @@ def run_stress_test_to_file(
     Args:
         input_path: Path to CSV with option parameters
         output_dir: Directory to save results
+        scenarios List[Dict]: List of scenarios to test. Defaults to DEFAULT_SCENARIOS.
     
     Returns:
         Absolute path to the resulting CSV file
     """
-    stress_scenarios = scenarios
 
     try:
         if not os.path.exists(input_path):
@@ -342,7 +342,7 @@ def run_stress_test_to_file(
 
         pnl_cols = []
         scenario_results = []
-        for scenario in stress_scenarios:
+        for scenario in scenarios:
             res_df = _run_stress_test(df, scenario)
             scenario_results.append(res_df)
             pnl_cols.append(f"{scenario['name']}_PnL")
@@ -378,7 +378,7 @@ def run_stress_test_to_file(
         
         # Save results
         os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.basename(input_path).replace(".csv", f"_stress_test.csv")
+        filename = os.path.basename(input_path).replace(".csv", f"_stress_test_results.csv")
         output_path = os.path.join(output_dir, filename)
         
         final_df.to_csv(output_path, index=False)
@@ -530,7 +530,7 @@ def _summarize_pnl_scenarios(
 def run_pnl_attribution_test_to_file(
     input_path: str, 
     output_dir: str,
-    scenarios: List[Dict] | None = None,
+    scenarios: List[Dict] = DEFAULT_SCENARIOS,
 ) -> str:
     """
     Execute P&L attribution tests for all options in a CSV file.
@@ -541,7 +541,7 @@ def run_pnl_attribution_test_to_file(
     Args:
         input_path (str): Absolute path to the input CSV file containing option data.
         output_dir (str): Directory where the output CSV will be saved.
-        scenarios (List[Dict] | None): Optional list of scenarios to test. Defaults to DEFAULT.
+        scenarios List[Dict]: List of scenarios to test. Defaults to DEFAULT_SCENARIOS.
 
     Returns:
         str: The absolute path to the generated result file.
@@ -558,10 +558,6 @@ def run_pnl_attribution_test_to_file(
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
             return f"Missing columns: {missing}"
-        
-        if not scenarios:
-            # Default market moves for demonstration
-            scenarios = DEFAULT_SCENARIOS
         
         results = df.apply(lambda r: _summarize_pnl_scenarios(r, scenarios), axis=1)
         summary_df = pd.concat([df, results], axis=1)
