@@ -57,13 +57,23 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
     )
 
     messages = list(state.get("messages", []))
-    messages.append(SystemMessage(content=system_prompt))
-    messages.append(HumanMessage(content=user_prompt))
+    
+    # 1. Inject Task (User Prompt) IF NOT returning from a tool call.
+    # We assume if the last message is a ToolMessage, we are in the middle of a loop 
+    # and don't need to re-state the objective.
+    # Otherwise (empty history, or returning from another agent), we append the task.
+    is_tool_return = (len(messages) > 0 and isinstance(messages[-1], ToolMessage))
+    
+    if not is_tool_return:
+        messages.append(HumanMessage(content=user_prompt))
+
+    # 2. Prepend System Prompt (Ephemeral: sent to LLM but not saved to state history)
+    invocation_messages = [SystemMessage(content=system_prompt)] + messages
          
     
     # Invoke
     try:
-        ai_msg = llm.invoke(messages)
+        ai_msg = llm.invoke(invocation_messages)
         messages.append(ai_msg)
         state["messages"] = messages
         print(f">>> [Pricing Calculator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")

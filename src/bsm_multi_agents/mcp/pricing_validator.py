@@ -389,7 +389,7 @@ def run_stress_test_to_file(
         return f"Error: Stress test execution failed: {str(e)}"
 
 # ============================================================================
-# P&L ANALYSIS TEST (Wraps run_pnl_test from tools)
+# P&L ANALYSIS TEST 
 # ============================================================================
 
 def _calculate_scenario_pnl(
@@ -571,3 +571,94 @@ def run_pnl_attribution_test_to_file(
     
     except Exception as e:
         return f"P&L test error: {str(e)}"
+
+
+# ============================================================================
+# GAMMA POSITIVE TEST 
+# ============================================================================
+
+
+def run_gamma_positivity_test(row: pd.Series) -> bool:
+    """
+    Check if the Gamma of an option is positive (convexity check).
+    
+    This function validates the fundamental property that long vanilla options 
+    should have positive Gamma (convexity) by verifying that:
+    V(S+h) + V(S-h) - 2V(S) > 0
+
+    Args:
+        row (pd.Series): A row containing option parameters:
+            - 'option_type': 'call' or 'put'
+            - 'S': Spot price
+            - 'K': Strike price
+            - 'T': Time to maturity
+            - 'r': Risk-free rate
+            - 'sigma': Volatility
+
+    Returns:
+        bool: True if Gamma is positive (convex), False otherwise.
+    """
+
+    opt_type = row['option_type']
+    S0 = float(row['S'])
+    K = float(row['K'])
+    T0 = float(row['T'])
+    r = float(row['r'])
+    sigma0 = float(row['sigma'])
+
+    V0 = _bsm_price(opt_type, S0, K, T0, r, sigma0)
+
+    # Bump prices up and down by 1%
+    bump = S0 * 0.01
+    V_up = _bsm_price(opt_type, S0 + bump, K, T0, r, sigma0)
+    V_down = _bsm_price(opt_type, S0 - bump, K, T0, r, sigma0)
+
+    # Check gamma positivity condition
+    gamma_condition = V_up + V_down - 2 * V0
+    return gamma_condition > 0
+
+def run_gamma_positivity_test_to_file(
+    input_path: str, 
+    output_dir: str,
+) -> str:
+    """
+    Execute the specialized Gamma Positivity (Convexity) Test Suite.
+
+    This is a distinct stress test that verifies the fundamental no-arbitrage
+    condition of option convexity: V(S+h) + V(S-h) - 2V(S) > 0.
+    It performs a bump-and-reprice analysis which is independent of the 
+    standard Greek range validation.
+
+    Args:
+        input_path (str): Absolute path to the input CSV file containing option parameters.
+        output_dir (str): Directory where the output CSV will be saved.
+
+    Returns:
+        str: Absolute path to the generated results file.
+    """
+    try:
+        if not os.path.exists(input_path):
+            return f"Input file not found at {input_path}"
+        
+        df = pd.read_csv(input_path)
+        if df.empty:
+            return f"CSV is empty"
+        
+        required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
+        missing = [c for c in required_cols if c not in df.columns]
+        if missing:
+            return f"Missing columns: {missing}"
+        
+        results = df.apply(lambda r: run_gamma_positivity_test(r), axis=1)
+        summary_df = df.copy()
+        summary_df['gamma_positivity'] = results
+        
+        filename = os.path.basename(input_path).replace(".csv", "_gamma_positivity_test_results.csv")
+        output_path = os.path.join(output_dir, filename)
+        
+        summary_df.to_csv(output_path, index=False)
+        
+        return os.path.abspath(output_path)
+    
+    except Exception as e:
+        return f"Gamma test error: {str(e)}"

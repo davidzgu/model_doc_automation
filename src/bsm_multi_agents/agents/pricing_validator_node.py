@@ -43,15 +43,18 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
     # We give the LLM the context (files) and let it choose the tools.
     system_prompt = (
         "You are a quantitative validator agent. "
-        "You have access to tools specifically for Greeks calculation via an MCP server, as well as local math tools. "
-        "You operate in a ReAct loop: you can call a tool, see the result, and then decide to call another tool or finish. "
-        "Use the available tools to process the requested data. "
-        "Your validation process MUST include:\n"
-        "1. **Greek Validation**: Validate ranges for Delta, Gamma, Vega, etc.\n"
-        "2. **Stress Testing**: Run stress tests with market scenarios.\n"
-        "3. **P&L Attribution**: Execute P&L analysis and attribution tests.\n"
-        "If you have multiple distinct tasks, handle them one by one or together.\n"
-        "IMPORTANT: When you have completed ALL requested tasks and saved the results, you MUST output a final text response (e.g. 'Calibration and calculation complete.') with NO tool calls. This will signal the workflow to proceed."
+        "You have access to a suite of validation tools via an MCP server. "
+        "Your goal is to perform a comprehensive validation suite on the provided data.\n\n"
+        "REQUIRED INDEPENDENT CHECKS (Execute ALL in parallel):\n"
+        "1. **Greek Range Validation**: Check if Greeks (Delta, Vega, etc.) are within theoretical bounds.\n"
+        "2. **Stress Testing**: Run market scenario simulations to test portfolio resilience.\n"
+        "3. **Convexity Check**: A specialized test to verify Gamma positivity (convexity structure).\n\n"
+        "4. **P&L Attribution**: specific P&L analysis and attribution tests.\n"
+        "CRITICAL INSTRUCTION: \n"
+        "You MUST search for and select the appropriate tool for EACH of the 4 checks above. "
+        "Do not assume one tool covers multiple checks unless explicit. "
+        "**You MUST call ALL necessary tools in a SINGLE turn (in parallel).** "
+        "Generate all tool calls at once."
     )
     
     user_prompt = (
@@ -63,12 +66,20 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
     )
 
     messages = list(state.get("messages", []))
-    messages.append(SystemMessage(content=system_prompt))
-    messages.append(HumanMessage(content=user_prompt))
+    
+    # 1. Inject Task (User Prompt) IF NOT returning from a ReAct tool loop.
+    # If the last message is a ToolMessage, we are mid-loop.
+    is_tool_return = (len(messages) > 0 and isinstance(messages[-1], ToolMessage))
+    
+    if not is_tool_return:
+        messages.append(HumanMessage(content=user_prompt))
+
+    # 2. Prepend System Prompt (Ephemeral)
+    invocation_messages = [SystemMessage(content=system_prompt)] + messages
     
     # Invoke
     try:
-        ai_msg = llm.invoke(messages)
+        ai_msg = llm.invoke(invocation_messages)
         messages.append(ai_msg)
         state["messages"] = messages
         print(f">>> [Pricing Validator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
