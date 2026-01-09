@@ -6,7 +6,8 @@ import numpy as np
 from scipy.stats import norm
 from datetime import datetime, timedelta
 
-DEFAULT_SCENARIOS = [
+
+DEFAULT_STRESS_SCENARIOS = [
     {"name": "Black Monday (1987)", "spot_change": -0.20, "vol_change": 0.50, "rate_change": -0.005},
     {"name": "Dot-com Crash (2000)", "spot_change": -0.70, "vol_change": 2.00, "rate_change": -0.02},
     {"name": "2008 Financial Crisis", "spot_change": -0.50, "vol_change": 1.50, "rate_change": -0.01},
@@ -14,6 +15,31 @@ DEFAULT_SCENARIOS = [
     {"name": "Rate Shock (+200bps)", "spot_change": 0.0, "vol_change": 0.0, "rate_change": 0.02},
     {"name": "Liquidation Scenario", "spot_change": -0.30, "vol_change": 3.00, "rate_change": 0.01},
     {"name": "Volatility Collapse", "spot_change": 0.05, "vol_change": -0.50, "rate_change": 0.0},
+]
+
+
+DEFAULT_SENSITIVITY_SCENARIOS = [
+    {"name": "spot_bump_-0.05", "spot_change": -0.05},
+    {"name": "spot_bump_-0.02", "spot_change": -0.02},
+    {"name": "spot_bump_-0.01", "spot_change": -0.01},
+    {"name": "spot_bump_0", "spot_change": 0.0},
+    {"name": "spot_bump_0.01", "spot_change": 0.01},
+    {"name": "spot_bump_0.02", "spot_change": 0.02},
+    {"name": "spot_bump_0.05", "spot_change": 0.05},
+    {"name": "vol_bump_-0.05", "vol_change": -0.05},
+    {"name": "vol_bump_-0.02", "vol_change": -0.02},    
+    {"name": "vol_bump_-0.01", "vol_change": -0.01},
+    {"name": "vol_bump_0", "vol_change": 0.0},
+    {"name": "vol_bump_0.01", "vol_change": 0.01},
+    {"name": "vol_bump_0.02", "vol_change": 0.02},
+    {"name": "vol_bump_0.05", "vol_change": 0.05},
+    {"name": "rate_bump_-0.05", "rate_change": -0.05},
+    {"name": "rate_bump_-0.02", "rate_change": -0.02},
+    {"name": "rate_bump_-0.01", "rate_change": -0.01},
+    {"name": "rate_bump_0", "rate_change": 0.0},
+    {"name": "rate_bump_0.01", "rate_change": 0.01},
+    {"name": "rate_bump_0.02", "rate_change": 0.02},
+    {"name": "rate_bump_0.05", "rate_change": 0.05},
 ]
 
 # ============================================================================
@@ -33,8 +59,9 @@ def _bsm_price(
     """
     # Ensure T is not zero to avoid division by zero
     sqrtT = np.sqrt(np.maximum(T, 1e-9))
-    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
-    d2 = d1 - sigma * sqrtT
+    with np.errstate(divide='ignore', invalid='ignore'):
+        d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
+        d2 = d1 - sigma * sqrtT
     
     # Vectorized conditions
     is_call = (option_type == 'call') if isinstance(option_type, str) else (option_type.str.lower() == 'call')
@@ -62,7 +89,8 @@ def _bsm_delta(
 ) -> Union[float, pd.Series]:
     """Calculate option delta (∂Price/∂S)."""
     sqrtT = np.sqrt(np.maximum(T, 1e-9))
-    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
     
     is_call = (option_type == 'call') if isinstance(option_type, str) else (option_type.str.lower() == 'call')
     delta_call = norm.cdf(d1)
@@ -85,7 +113,8 @@ def _bsm_gamma(
 ) -> Union[float, pd.Series]:
     """Calculate option gamma (∂²Price/∂S²)."""
     sqrtT = np.sqrt(np.maximum(T, 1e-9))
-    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
     gamma = norm.pdf(d1) / (S * sigma * sqrtT)
     return np.where(T <= 0, 0.0, gamma)
 
@@ -98,7 +127,8 @@ def _bsm_vega(
 ) -> Union[float, pd.Series]:
     """Calculate option vega (∂Price/∂σ, per 1% change)."""
     sqrtT = np.sqrt(np.maximum(T, 1e-9))
-    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
     vega = S * norm.pdf(d1) * sqrtT / 100.0
     return np.where(T <= 0, 0.0, vega)
 
@@ -112,8 +142,9 @@ def _bsm_theta(
 ) -> Union[float, pd.Series]:
     """Calculate option theta (∂Price/∂T, per day)."""
     sqrtT = np.sqrt(np.maximum(T, 1e-9))
-    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
-    d2 = d1 - sigma * sqrtT
+    with np.errstate(divide='ignore', invalid='ignore'):
+        d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrtT)
+        d2 = d1 - sigma * sqrtT
     
     theta_annual_base = (-S * norm.pdf(d1) * sigma / (2 * sqrtT))
     
@@ -249,150 +280,13 @@ def validate_greeks_to_file(
     except Exception as e:
         return json.dumps({"errors": [f"Error: {str(e)}"]})
 
-# ============================================================================
-# SENSITIVITY TEST
-# ============================================================================
 
-def _run_stress_test(
-    df: pd.DataFrame,
-    scenario: Dict,
-) -> pd.DataFrame:
-    """
-    Run stress test with extreme market scenarios for multiple rows.
-    Returns only the scenario-specific columns.
-    """
-    name = scenario.get('name', 'Unknown')
-    spot_change = float(scenario.get('spot_change', 0.0))
-    vol_change = float(scenario.get('vol_change', 0.0))
-    rate_change = float(scenario.get('rate_change', 0.0))
-
-    # Base parameters (as Series)
-    opt_type = df['option_type']
-    S = df['S']
-    K = df['K']
-    T = df['T']
-    r = df['r']
-    sigma = df['sigma']
-
-    # Vectorized base price calculation (already calculated once in run_stress_test_to_file but for robustness)
-    # Actually, we expect 'base_price' to be in df if we want to save recalculating, 
-    # but for a pure function, we can take it from df or recalculate. 
-    # Let's assume we pass it in.
-    if 'base_price' in df.columns:
-        base_price = df['base_price']
-    else:
-        base_price = _bsm_price(opt_type, S, K, T, r, sigma)
-
-    # Calculate stressed parameters
-    S_stressed = S * (1 + spot_change)
-    sigma_stressed = np.maximum(0.001, sigma + vol_change)
-    r_stressed = r + rate_change
-    
-    # Vectorized stressed price calculation
-    stressed_price = _bsm_price(opt_type, S_stressed, K, T, r_stressed, sigma_stressed)
-    
-    pnl = stressed_price - base_price
-    pnl_pct = np.where(base_price != 0, (pnl / base_price * 100), 0.0)
-    
-    # Create result DataFrame with scenario columns
-    results = pd.DataFrame(index=df.index)
-    results[f"{name}_spot_change_pct"] = spot_change * 100
-    results[f"{name}_vol_change_pct"] = vol_change * 100
-    results[f"{name}_rate_change_pct"] = rate_change * 100
-    results[f"{name}_stressed_price"] = stressed_price
-    results[f"{name}_PnL"] = pnl
-    results[f"{name}_PnL%"] = pnl_pct
-    
-    return results
-
-def run_stress_test_to_file(
-    input_path: str, output_dir: str,
-    scenarios: List[Dict] = DEFAULT_SCENARIOS
-) -> str:
-    """
-    Run stress tests for all options in CSV using extreme market scenarios.
-    
-    Args:
-        input_path: Path to CSV with option parameters
-        output_dir: Directory to save results
-        scenarios List[Dict]: List of scenarios to test. Defaults to DEFAULT_SCENARIOS.
-    
-    Returns:
-        Absolute path to the resulting CSV file
-    """
-
-    try:
-        if not os.path.exists(input_path):
-            return f"Error: Input file not found at {input_path}"
-        
-        df = pd.read_csv(input_path)
-        if df.empty:
-            return "Error: CSV is empty"
-        
-        # skip duplicate rows as requested
-        df = df.drop_duplicates().reset_index(drop=True)
-        
-        required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
-        missing = [c for c in required_cols if c not in df.columns]
-        if missing:
-            return f"Error: Missing columns: {missing}"
-        
-        # Pre-calculate base price once
-        df['base_price'] = _bsm_price(df['option_type'], df['S'], df['K'], df['T'], df['r'], df['sigma'])
-
-        pnl_cols = []
-        scenario_results = []
-        for scenario in scenarios:
-            res_df = _run_stress_test(df, scenario)
-            scenario_results.append(res_df)
-            pnl_cols.append(f"{scenario['name']}_PnL")
-        
-        # Merge all results horizontally
-        final_df = pd.concat([df] + scenario_results, axis=1)
-        
-        # Identify worst-case scenario per row
-        # idxmin skips NaNs by default. If all are NaN, it returns NaN.
-        final_df['worst_case_col'] = final_df[pnl_cols].idxmin(axis=1)
-        final_df['worst_case_pnl'] = final_df[pnl_cols].min(axis=1)
-        
-        # Handle scenario name extraction safely
-        def get_worst_scenario_name(col_val):
-            if pd.isna(col_val):
-                return "None"
-            return str(col_val).replace("_PnL", "")
-
-        final_df['worst_case_scenario'] = final_df['worst_case_col'].apply(get_worst_scenario_name)
-        
-        # Get worst case PnL% safely
-        def get_worst_pnl_pct(row):
-            scen = row['worst_case_scenario']
-            if scen == "None":
-                return np.nan
-            col_name = f"{scen}_PnL%"
-            return row.get(col_name, np.nan)
-
-        final_df['worst_case_pnl_pct'] = final_df.apply(get_worst_pnl_pct, axis=1)
-        
-        # Clean up temporary column
-        final_df = final_df.drop(columns=['worst_case_col'])
-        
-        # Save results
-        os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.basename(input_path).replace(".csv", f"_stress_test_results.csv")
-        output_path = os.path.join(output_dir, filename)
-        
-        final_df.to_csv(output_path, index=False)
-        
-        return os.path.abspath(output_path)
-    
-    except Exception as e:
-        return f"Error: Stress test execution failed: {str(e)}"
 
 # ============================================================================
-# P&L ANALYSIS TEST 
+# Sensitivity TEST 
 # ============================================================================
 
-def _calculate_scenario_pnl(
+def _calculate_scenario_attribution(
     row: pd.Series,
     scenario: Dict[str, float],
 ) -> Dict[str, float]:
@@ -410,18 +304,18 @@ def _calculate_scenario_pnl(
         Dict[str, float]: A dictionary containing actual P&L, estimated P&L, attribution components, and error metrics.
     """
     opt_type = row['option_type']
-    S0 = float(row['S'])
-    K = float(row['K'])
-    T0 = float(row['T'])
-    r = float(row['r'])
-    sigma0 = float(row['sigma'])
+    S_base = float(row['S'])
+    K_base = float(row['K'])
+    T_base = float(row['T'])
+    r_base = float(row['r'])
+    sigma_base = float(row['sigma'])
 
     # Base case
-    V0 = _bsm_price(opt_type, S0, K, T0, r, sigma0)
-    delta0 = _bsm_delta(opt_type, S0, K, T0, r, sigma0)
-    gamma0 = _bsm_gamma(S0, K, T0, r, sigma0)
-    vega0 = _bsm_vega(S0, K, T0, r, sigma0)
-    theta0 = _bsm_theta(opt_type, S0, K, T0, r, sigma0)
+    V_base = _bsm_price(opt_type, S_base, K_base, T_base, r_base, sigma_base)
+    delta_base = _bsm_delta(opt_type, S_base, K_base, T_base, r_base, sigma_base)
+    gamma_base = _bsm_gamma(S_base, K_base, T_base, r_base, sigma_base)
+    vega_base = _bsm_vega(S_base, K_base, T_base, r_base, sigma_base)
+    theta_base = _bsm_theta(opt_type, S_base, K_base, T_base, r_base, sigma_base)
 
     scenario_name = scenario.get('name', 'Unknown')
     spot_change = scenario.get('spot_change', 0.0)
@@ -429,49 +323,53 @@ def _calculate_scenario_pnl(
     days_passed = scenario.get('days_passed', 0.0)
     rate_change = scenario.get('rate_change', 0.0)
 
-    S1 = S0*(1+spot_change)
-    sigma1 = sigma0*(1+vol_change)
-    T1 = max(0, T0 - days_passed / 365.0)
-    r1 = r*(1+rate_change)
+    S_stress = S_base*(1+spot_change)
+    sigma_stress = np.maximum(0.001, sigma_base + vol_change)
+    T_stress = max(0, T_base - days_passed / 365.0)
+    r_stress = r_base + rate_change
 
     # New option price
-    V1 = _bsm_price(opt_type, S1, K, T1, r1, sigma1)
-    actual_pnl = V1 - V0
+    V_stress = _bsm_price(opt_type, S_stress, K_base, T_stress, r_stress, sigma_stress)
+    actual_pnl = V_stress - V_base
+    pnl_pct = np.where(V_base != 0, (actual_pnl / V_base * 100), 0.0)
 
     # Greeks-based P&L estimate
-    spot_move = S1 - S0
-    vol_move = sigma1 - sigma0
-    rate_move = r1 - r
+    spot_move = S_stress - S_base
+    vol_move = sigma_stress - sigma_base
+    rate_move = r_stress - r_base
     time_decay = days_passed / 365.0
 
     # P&L components
-    delta_pnl = delta0 * spot_move
-    gamma_pnl = 0.5 * gamma0 * (spot_move ** 2)
-    vega_pnl = vega0 * vol_move
-    theta_pnl = theta0 * time_decay
+    delta_pnl = delta_base * spot_move
+    gamma_pnl = 0.5 * gamma_base * (spot_move ** 2)
+    vega_pnl = vega_base * vol_move
+    theta_pnl = theta_base * time_decay
 
     # Total estimated P&L
     estimated_pnl = delta_pnl + gamma_pnl + vega_pnl + theta_pnl
     pnl_error = actual_pnl - estimated_pnl
 
     # Realized variance (gamma P&L proxy)
-    realized_var = (spot_move / S0) ** 2 if S0 != 0 else 0
+    realized_var = (spot_move / S_base) ** 2 if S_base != 0 else 0
 
     # Delta-hedged P&L (excluding delta component)
     hedged_pnl = gamma_pnl + vega_pnl + theta_pnl
 
     result = {
+        # Scenario Info
         "scenario_name": scenario_name,
-        "spot_level": S1,
-        "spot_move": spot_move,
-        "vol_level": sigma1,
-        "vol_move": vol_move,
-        "days_passed": days_passed,
-        "rate_level": r1,
-        "rate_move": rate_move,
-        "base_price": V0,
-        "new_price": V1,
+        "scen_spot_change": spot_change,
+        "scen_vol_change": vol_change,
+        "scen_time_step": days_passed, 
+        "scen_rate_change": rate_change,
+        
+        # Prices
+        "base_price": V_base,
+        "new_price": V_stress,
+        
+        # PnL Attribution
         "actual_pnl": actual_pnl,
+        "pnl_pct": pnl_pct,
         "delta_pnl": delta_pnl,
         "gamma_pnl": gamma_pnl,
         "vega_pnl": vega_pnl,
@@ -484,64 +382,45 @@ def _calculate_scenario_pnl(
 
     return result
 
-def _summarize_pnl_scenarios(
+def _run_sensitivity_test_on_single_trade(
     row: pd.Series,
-    scenarios: List[Dict] | None = None,
-) -> pd.Series:
+    scenarios: List[Dict] = DEFAULT_SENSITIVITY_SCENARIOS,
+) -> List[Dict]:
     """
-    Run multiple P&L scenarios for a single option and calculate summary metrics.
-
-    Aggregates results across all provided scenarios to find average/max/min P&L
-    and errors to evaluate pricing model stability or hedging effectiveness.
-
-    Args:
-        row (pd.Series): A row containing option parameters.
-        scenarios (List[Dict] | None): A list of scenario dictionaries. Defaults to global DEFAULT_SCENARIOS.
-
-    Returns:
-        pd.Series: Summary statistics including num_scenarios, avg_actual_pnl, max_pnl_error, etc.
+    Run sensitivity analysis for a SINGLE trade across multiple scenarios.
+    Returns a list of dictionaries, where each dictionary is a flattened row 
+    containing BOTH the original trade info and the scenario results.
     """
-    if not scenarios:
-        # Default market moves for demonstration
-        scenarios = DEFAULT_SCENARIOS
+    results = []
     
-    details = [_calculate_scenario_pnl(row, s) for s in scenarios]
+    # Convert original trade row to dict to preserve its info
+    trade_info = row.to_dict()
+    
+    for sc in scenarios:
+        # Calculate PnL/Attribution for this scenario
+        attribution = _calculate_scenario_attribution(row, sc)
+        
+        # Merge: Trade Info + Scenario Results
+        # Note: If keys collide (unlikely given naming), attribution overwrites trade_info.
+        # usually trade_info has 'S', 'vol', etc. attribution has 'scen_spot_change', etc.
+        combined_record = {**trade_info, **attribution}
+        results.append(combined_record)
+    
+    return results
 
-    num_scenarios = len(details)
-    avg_actual_pnl = np.mean([d['actual_pnl'] for d in details])
-    max_actual_pnl = np.max([d['actual_pnl'] for d in details])
-    min_actual_pnl = np.min([d['actual_pnl'] for d in details])
-    avg_pnl_error = np.mean([d['pnl_error'] for d in details])
-    max_pnl_error = np.max(np.abs([d['pnl_error'] for d in details]))
-    avg_delta_hedged_pnl = np.mean([d['delta_hedged_pnl'] for d in details])
-    
-    
-    return pd.Series({
-        'num_scenarios': num_scenarios,
-        'avg_actual_pnl': avg_actual_pnl,
-        'max_actual_pnl': max_actual_pnl,
-        'min_actual_pnl': min_actual_pnl,
-        'avg_pnl_error': avg_pnl_error,
-        'max_pnl_error': max_pnl_error,
-        'avg_delta_hedged_pnl': avg_delta_hedged_pnl,
-        'details': details
-    })
-
-def run_pnl_attribution_test_to_file(
+def run_sensitivity_test_to_file(
     input_path: str, 
     output_dir: str,
-    scenarios: List[Dict] = DEFAULT_SCENARIOS,
+    scenarios: List[Dict] = DEFAULT_SENSITIVITY_SCENARIOS,
 ) -> str:
     """
     Execute P&L attribution tests for all options in a CSV file.
-
-    Reads option data, runs specified scenarios for each option, aggregates results,
-    and saves the detailed analysis to a CSV file.
+    Output is in LONG format: One row per trade per scenario.
 
     Args:
         input_path (str): Absolute path to the input CSV file containing option data.
         output_dir (str): Directory where the output CSV will be saved.
-        scenarios List[Dict]: List of scenarios to test. Defaults to DEFAULT_SCENARIOS.
+        scenarios List[Dict]: List of scenarios to test. Defaults to DEFAULT_SENSITIVITY_SCENARIOS.
 
     Returns:
         str: The absolute path to the generated result file.
@@ -559,13 +438,21 @@ def run_pnl_attribution_test_to_file(
         if missing:
             return f"Missing columns: {missing}"
         
-        results = df.apply(lambda r: _summarize_pnl_scenarios(r, scenarios), axis=1)
-        summary_df = pd.concat([df, results], axis=1)
+        # Iterate over all trades calculate results
+        all_results = []
+        for _, row in df.iterrows():
+            trade_results = _run_sensitivity_test_on_single_trade(row, scenarios)
+            all_results.extend(trade_results)
+            
+        # Create final DataFrame from list of dicts
+        final_df = pd.DataFrame(all_results)
         
-        filename = os.path.basename(input_path).replace(".csv", "_pnl_test_results.csv")
+        filename = os.path.basename(input_path).replace(".csv", "_sensitivity_test_results.csv")
         output_path = os.path.join(output_dir, filename)
         
-        summary_df.to_csv(output_path, index=False)
+        # Save without index (row number is meaningless in long format)
+        os.makedirs(output_dir, exist_ok=True)
+        final_df.to_csv(output_path, index=False)
         
         return os.path.abspath(output_path)
     
@@ -578,7 +465,7 @@ def run_pnl_attribution_test_to_file(
 # ============================================================================
 
 
-def run_gamma_positivity_test(row: pd.Series) -> bool:
+def _run_gamma_positivity_test(row: pd.Series) -> bool:
     """
     Check if the Gamma of an option is positive (convexity check).
     
@@ -649,7 +536,7 @@ def run_gamma_positivity_test_to_file(
         if missing:
             return f"Missing columns: {missing}"
         
-        results = df.apply(lambda r: run_gamma_positivity_test(r), axis=1)
+        results = df.apply(lambda r: _run_gamma_positivity_test(r), axis=1)
         summary_df = df.copy()
         summary_df['gamma_positivity'] = results
         
@@ -662,3 +549,138 @@ def run_gamma_positivity_test_to_file(
     
     except Exception as e:
         return f"Gamma test error: {str(e)}"
+
+
+
+# ============================================================================
+# SENSITIVITY TEST
+# ============================================================================
+
+
+# def run_stress_test_to_file(
+#     input_path: str, output_dir: str,
+#     scenarios: List[Dict] = DEFAULT_SCENARIOS
+# ) -> str:
+#     """
+#     Run stress tests for all options in CSV using extreme market scenarios.
+    
+#     Args:
+#         input_path: Path to CSV with option parameters
+#         output_dir: Directory to save results
+#         scenarios List[Dict]: List of scenarios to test. Defaults to DEFAULT_SCENARIOS.
+    
+#     Returns:
+#         Absolute path to the resulting CSV file
+#     """
+
+#     try:
+#         if not os.path.exists(input_path):
+#             return f"Error: Input file not found at {input_path}"
+        
+#         df = pd.read_csv(input_path)
+#         if df.empty:
+#             return "Error: CSV is empty"
+        
+#         # skip duplicate rows as requested
+#         df = df.drop_duplicates().reset_index(drop=True)
+        
+#         required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
+#         missing = [c for c in required_cols if c not in df.columns]
+#         if missing:
+#             return f"Error: Missing columns: {missing}"
+        
+#         # Pre-calculate base price once
+#         df['base_price'] = _bsm_price(df['option_type'], df['S'], df['K'], df['T'], df['r'], df['sigma'])
+
+#         pnl_cols = []
+#         scenario_results = []
+#         for scenario in scenarios:
+#             res_df = _run_stress_test(df, scenario)
+#             scenario_results.append(res_df)
+#             pnl_cols.append(f"{scenario['name']}_PnL")
+        
+#         # Merge all results horizontally
+#         final_df = pd.concat([df] + scenario_results, axis=1)
+        
+#         # Identify worst-case scenario per row
+#         # idxmin skips NaNs by default. If all are NaN, it returns NaN.
+#         final_df['worst_case_col'] = final_df[pnl_cols].idxmin(axis=1)
+#         final_df['worst_case_pnl'] = final_df[pnl_cols].min(axis=1)
+        
+#         # Handle scenario name extraction safely
+#         def get_worst_scenario_name(col_val):
+#             if pd.isna(col_val):
+#                 return "None"
+#             return str(col_val).replace("_PnL", "")
+
+#         final_df['worst_case_scenario'] = final_df['worst_case_col'].apply(get_worst_scenario_name)
+        
+#         # Get worst case PnL% safely
+#         def get_worst_pnl_pct(row):
+#             scen = row['worst_case_scenario']
+#             if scen == "None":
+#                 return np.nan
+#             col_name = f"{scen}_PnL%"
+#             return row.get(col_name, np.nan)
+
+#         final_df['worst_case_pnl_pct'] = final_df.apply(get_worst_pnl_pct, axis=1)
+        
+#         # Clean up temporary column
+#         final_df = final_df.drop(columns=['worst_case_col'])
+        
+#         # Save results
+#         os.makedirs(output_dir, exist_ok=True)
+#         filename = os.path.basename(input_path).replace(".csv", f"_stress_test_results.csv")
+#         output_path = os.path.join(output_dir, filename)
+        
+#         final_df.to_csv(output_path, index=False)
+        
+#         return os.path.abspath(output_path)
+    
+#     except Exception as e:
+#         return f"Error: Stress test execution failed: {str(e)}"
+
+# def _summarize_pnl_scenarios(
+#     row: pd.Series,
+#     scenarios: List[Dict] | None = None,
+# ) -> pd.Series:
+#     """
+#     Run multiple P&L scenarios for a single option and calculate summary metrics.
+
+#     Aggregates results across all provided scenarios to find average/max/min P&L
+#     and errors to evaluate pricing model stability or hedging effectiveness.
+
+#     Args:
+#         row (pd.Series): A row containing option parameters.
+#         scenarios (List[Dict] | None): A list of scenario dictionaries. Defaults to global DEFAULT_SCENARIOS.
+
+#     Returns:
+#         pd.Series: Summary statistics including num_scenarios, avg_actual_pnl, max_pnl_error, etc.
+#     """
+#     if not scenarios:
+#         # Default market moves for demonstration
+#         scenarios = DEFAULT_PNL_SCENARIOS
+    
+#     details = [_calculate_scenario_pnl(row, s) for s in scenarios]
+
+#     num_scenarios = len(details)
+#     avg_actual_pnl = np.mean([d['actual_pnl'] for d in details])
+#     max_actual_pnl = np.max([d['actual_pnl'] for d in details])
+#     min_actual_pnl = np.min([d['actual_pnl'] for d in details])
+#     avg_pnl_error = np.mean([d['pnl_error'] for d in details])
+#     max_pnl_error = np.max(np.abs([d['pnl_error'] for d in details]))
+#     avg_delta_hedged_pnl = np.mean([d['delta_hedged_pnl'] for d in details])
+    
+    
+#     return pd.Series({
+#         'num_scenarios': num_scenarios,
+#         'avg_actual_pnl': avg_actual_pnl,
+#         'max_actual_pnl': max_actual_pnl,
+#         'min_actual_pnl': min_actual_pnl,
+#         'avg_pnl_error': avg_pnl_error,
+#         'max_pnl_error': max_pnl_error,
+#         'avg_delta_hedged_pnl': avg_delta_hedged_pnl,
+#         'details': details
+#     })
+
+
