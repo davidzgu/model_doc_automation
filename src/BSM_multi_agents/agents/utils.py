@@ -87,25 +87,25 @@ def print_resp(resp):
         elif isinstance(message, AIMessage):
             if hasattr(message, 'tool_calls') and message.tool_calls:
                 # Agent 决定调用工具
-                print(f"Step {step_num} - Agent decide tools used:")
+                yield(f"Step {step_num} - Agent decide tools used:")
                 for tool_call in message.tool_calls:
-                    print(f"   Tool name: {tool_call['name']}")
-                    print(f"   Tool parameters: {tool_call['args']}")
-                print()
+                    yield(f"   Tool name: {tool_call['name']}")
+                    yield(f"   Tool parameters: {tool_call['args']}")
+                yield()
                 step_num += 1
             elif message.content:
-                print(f"Step {step_num} - Agent outputs:")
-                print(f"   {message.content}")
-                print()
+                yield(f"Step {step_num} - Agent outputs:")
+                yield(f"   {message.content}")
+                yield()
                 step_num += 1
 
         elif isinstance(message, ToolMessage):
-            print(f"Step {step_num} - outputs:")
-            print(f"   Tool name: {message.name}")
+            yield(f"Step {step_num} - outputs:")
+            yield(f"   Tool name: {message.name}")
             # result_preview = message.content[:300] + "..." if len(message.content) > 300 else message.content
             result_preview = message.content
-            print(f"   Outputs: {result_preview}")
-            print()
+            yield(f"   Outputs: {result_preview}")
+            yield()
             step_num += 1
 
     print(f"\n{'='*80}")

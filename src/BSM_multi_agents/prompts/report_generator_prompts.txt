@@ -1,4 +1,4 @@
-Generate a professional Word OPA (Option Portfolio Analysis) report.
+Generate a professional Word OPA report.
 
 You have:
 - Markdown summary file at: {markdown_path}
@@ -8,6 +8,6 @@ Call the create_word_report tool with these parameters:
 - markdown_path: {markdown_path}
 - chart_paths: {chart_paths}
 - output_path: {output_path}
-- title: "Option Portfolio Analysis Report"
+- title: "OPA Report"
 
 Call the tool now to generate the Word document.

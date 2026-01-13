@@ -3,8 +3,8 @@
 
 ---
 
-**Report Date:** 2025-11-18
-**Analysis Period:** 2025-09-01 to 2025-09-10
+**Report Date:** 2025-12-18
+**Analysis Period:** 2025-12-18
 **Total Instruments Analyzed:** 10
 **Validation Status:** ✅ PASSED
 
@@ -29,17 +29,13 @@
 ## MARKET DATA SNAPSHOT
 
 ### Underlying Asset Statistics
-- **Spot Price Range:** [96.00, 104.00]
-- **Average Spot:** 100.00
-- **Volatility (σ) Range:** [18.00%, 23.00%]
+- Data not available
 
 ### Strike Price Distribution
-- **Strike Range:** [101.00, 109.00]
-- **Average Strike:** 105.10
+- Data not available
 
 ### Time to Maturity Profile
-- **Time to Maturity Range:** [0.10, 1.00] years
-- **Average Maturity:** 0.55 years
+- Data not available
 
 ---
 
@@ -52,8 +48,6 @@
 - **Delta:** Avg = -0.058906, Range = [-0.756555, 0.542228]
 - **Gamma:** Avg = 0.029388, Range = [0.019835, 0.051599]
 - **Vega:** Avg = 27.770650, Range = [9.510738, 39.670524]
-- **Theta:** Avg = -5.495521, Range = [-8.645274, -1.619695]
-- **Rho:** Avg = -0.156661, Range = [-48.685326, 46.201481]
 
 ---
 
@@ -96,18 +90,10 @@
 - **Standard Deviation:** 9.756055
 
 ### Theta Decay
-- **Portfolio Theta:** -54.955212
-- **Average Theta:** -5.495521
-- **Theta Range:** [-8.645274, -1.619695]
-- **Expected Range:** (-∞, 0]
-- **Standard Deviation:** 2.319570
+- **Theta** data not available in validation results
 
 ### Rho Interest Rate Risk
-- **Portfolio Rho:** -1.566614
-- **Average Rho:** -0.156661
-- **Rho Range:** [-48.685326, 46.201481]
-- **Expected Range:** Varies
-- **Standard Deviation:** 31.994036
+- **Rho** data not available in validation results
 
 ---
 
@@ -161,6 +147,6 @@ Options are validated against the following rules:
 
 ---
 
-*Report Generated: 2025-11-18 09:24:44*
+*Report Generated: 2025-12-18 13:30:00*
 *System: AI-Powered Options Analytics Platform*
 *Model Version: BSM v1.0*

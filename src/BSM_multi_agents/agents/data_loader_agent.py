@@ -49,6 +49,7 @@ def main():
     state = WorkflowState(csv_file_path=csv_path)
     out = data_loader_node(state)
     print_resp(out)
+    #yield from print_resp(out)
 
 if __name__ == "__main__":
     main()

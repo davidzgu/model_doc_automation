@@ -65,7 +65,7 @@ def report_generator_node(
         "markdown_path": markdown_path,
         "chart_paths": json.dumps(chart_paths) if chart_paths else "[]",
         "output_path": output_path,
-        "title": "Option Portfolio Analysis Report"
+        "title": "OPA Report"
     })
 
     # Parse result
