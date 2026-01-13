@@ -1,8 +1,0 @@
-Call the create_summary_charts tool immediately.
-
-Parameters (copy EXACTLY as shown):
-- bsm_results = {bsm_results}
-- greeks_results = {greeks_results}
-- output_dir = {output_dir}
-
-The data above is complete and ready. Do NOT ask for more data. Call the tool NOW.
