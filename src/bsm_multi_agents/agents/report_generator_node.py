@@ -26,13 +26,13 @@ def report_generator_agent_node(state: WorkflowState) -> WorkflowState:
     p = Path(csv_file_path)
     pricing_results_path = f"{output_dir}/{p.stem}_greeks_results{p.suffix}"
     validate_results_path = f"{output_dir}/{p.stem}_greeks_results_validate_results{p.suffix}"
-    stress_test_results_path = f"{output_dir}/{p.stem}_greeks_results_stress_test_results{p.suffix}"
-    gamma_positivity_test_results_path = f"{output_dir}/{p.stem}_greeks_results_gamma_positivity_test_results{p.suffix}"
+    sensitivity_test_results_path = f"{output_dir}/{p.stem}_sensitivity_test_results{p.suffix}"
+    gamma_positivity_test_results_path = f"{output_dir}/{p.stem}_gamma_positivity_test_results{p.suffix}"
     final_report_path = state.get("final_report_path")
-
+    
     # Load DataFrames
     df_pricing = pd.read_csv(pricing_results_path)
-    stress_test_results = pd.read_csv(stress_test_results_path)
+    sensitivity_test_results = pd.read_csv(sensitivity_test_results_path)
     gamma_positivity_test_results = pd.read_csv(gamma_positivity_test_results_path)
 
     ## Set parameters
@@ -69,7 +69,7 @@ def report_generator_agent_node(state: WorkflowState) -> WorkflowState:
 
         df_pricing_sub = df_pricing[df_pricing["asset_class"] == asset]
         df_gamma_positivity_test_results_sub = gamma_positivity_test_results[gamma_positivity_test_results["asset_class"] == asset]
-        df_stress_test_results_sub = stress_test_results[stress_test_results["asset_class"] == asset]
+        df_sensitivity_test_results_sub = sensitivity_test_results[sensitivity_test_results["asset_class"] == asset]
         
         print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section 2.{section_ordering}: {asset} pricing summary...")
         _generate_pricing_summary(doc, llm, asset, df_pricing_sub, section_ordering)
@@ -178,38 +178,23 @@ def _generate_pricing_summary(doc, llm, asset: str, df_pricing_sub: pd.DataFrame
     img_stream.seek(0)
 
     # LLM Summary
-    num_calls = len(df_call)
-    num_puts = len(df_put)
 
     system_prompt = (
-        "You are a Strict Data Analyst generating a technical report.\n"
-        "Your goal is to analyze the provided option pricing data and produce a structured statistical summary.\n"
-        "The data will contain the following columns:\n"
-        "- **Date:** The date on which the option price is calculated.\n"
-        "- **S:** Current price of the underlying asset.\n"
-        "- **K:** Exercise price of the option.\n"
-        "- **T:** Time remaining until option expiration, expressed in years.\n"
-        "- **r:** Annualized risk-free interest rate, used for discounting.\n"
-        "- **sigma:** Annualized standard deviation of the underlying asset’s returns.\n"
-        "- **option_type:** Call or Put.\n"
-        "- **asset_class:** Classification of the underlying asset (e.g., equity, index).\n"
-        "- **BSM_price:** Option price calculated using the Black-Scholes-Merton model.\n"
-        "- **error:** Error when calculating the BSM price.\n"
-        "The report should include the following paragraph:\n"
-        f"1. **Overall Data Quality**: State that there are exactly {num_calls} Call options and {num_puts} Put options (I have counted them for you). Mention column names present and any missing values observed.\n"
-        "2. **Pricing Level**: Report the Min, Max, and Average BSM_price for the asset class.\n"
-        "3. **Term Structure**: Describe the range of maturity and the relationship between Time (T) and Price. (e.g., 'Longer maturity options show higher prices...').\n"
-        "4. **Call vs Put Behavior**: Compare the average price of Calls vs Puts. Which is more expensive on average?\n"
-        "5. **Model Consistency**: Confirm if price > 0 for all rows. Check if prices monotonically increase with T (generally).\n"
-        "6. **Key Takeaway**: Summary of the portfolio's pricing health.\n\n"
+        "You are a Strict Data Analyst. Analyze the provided option pricing JSON data (Cols: ID, Date, S, K, T, r, sigma, option_type, asset_class, BSM_price) and produce a professional 5-section report:\n\n"
+        "1. **Overall Data Quality**: Count Calls/Puts. Check for missing values, outliers (negative price), and logic (Call<=S, Put<=K, T>0).\n"
+        "2. **Pricing Level**: Analyze Moneyness (S/K) and Volatility levels.\n"
+        "3. **Term Structure**: Describe Theta (price vs T) and Volatility Term Structure.\n"
+        "4. **Call vs Put Behavior**: Compare prices and check for observable Skew.\n"
+        "5. **Key Takeaway**: Summarize data reliability, market regime (high/low vol), anomalies, and potential strategies.\n\n"
+        "Keep it concise and strictly follow these 5 sections."
     )
     user_prompt = (
-        f"Analyze the following dataframe for **{asset}** options.\n\n"
-        "**Call Options:**\n"
-        f"{df_call.to_markdown(index=False)}\n\n"
-        "**Put Options:**\n"
-        f"{df_put.to_markdown(index=False)}\n\n"
-        "Generate the 6-paragraph statistical report now."
+        f"Analyze **{asset}** options:\n\n"
+        "**Calls (JSON):**\n"
+        f"{df_call}\n\n"
+        "**Puts (JSON):**\n"
+        f"{df_put}\n\n"
+        "Generate the report."
     )
 
     ai_msg = llm.invoke([
@@ -259,9 +244,9 @@ def _generate_gamma_summary(doc, llm, asset: str, df: pd.DataFrame, section_orde
             doc.add_paragraph(block.strip())
 
 
-def _generate_stress_test_summary(doc, llm, asset: str, df_stress: pd.DataFrame, section_ordering: int):
-    """Generate Stress Test Summary"""
-    doc.add_heading(f"2.{section_ordering}.4 Summary of Stress Testing for {asset}", level=3)
+def _generate_sensitivity_test_summary(doc, llm, asset: str, df_stress: pd.DataFrame, section_ordering: int):
+    """Generate Sensitivity Test Summary"""
+    doc.add_heading(f"2.{section_ordering}.4 Summary of Sensitivity Testing for {asset}", level=3)
     
     stress_results_call = df_stress[
         (df_stress['option_type'] == 'call')
