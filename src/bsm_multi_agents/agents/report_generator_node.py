@@ -26,8 +26,8 @@ def report_generator_agent_node(state: WorkflowState) -> WorkflowState:
     p = Path(csv_file_path)
     pricing_results_path = f"{output_dir}/{p.stem}_greeks_results{p.suffix}"
     validate_results_path = f"{output_dir}/{p.stem}_greeks_results_validate_results{p.suffix}"
-    sensitivity_test_results_path = f"{output_dir}/{p.stem}_sensitivity_test_results{p.suffix}"
-    gamma_positivity_test_results_path = f"{output_dir}/{p.stem}_gamma_positivity_test_results{p.suffix}"
+    sensitivity_test_results_path = f"{output_dir}/{p.stem}_greeks_results_sensitivity_test_results{p.suffix}"
+    gamma_positivity_test_results_path = f"{output_dir}/{p.stem}_greeks_results_gamma_positivity_test_results{p.suffix}"
     final_report_path = state.get("final_report_path")
     
     # Load DataFrames
@@ -78,7 +78,7 @@ def report_generator_agent_node(state: WorkflowState) -> WorkflowState:
         _generate_gamma_summary(doc, llm, asset, df_gamma_positivity_test_results_sub, section_ordering)
         
         print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section 2.{section_ordering}: {asset} stress test summary...")
-        _generate_stress_test_summary(doc, llm, asset, df_stress_test_results_sub, section_ordering)
+        _generate_sensitivity_test_summary(doc, llm, asset, df_sensitivity_test_results_sub, section_ordering)
 
     # 4. Save
     doc.save(final_report_path)
