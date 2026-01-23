@@ -16,8 +16,7 @@ def main():
     left_col, right_col = st.columns([0.618, 1])
     
     with left_col:
-        st.header("Tool Name")
-        st.write("Model Development Ongoing Performance Analysis Report Generator")
+        st.header("Model Development Ongoing Performance Analysis Report Generator")
         
         st.header("Purpose of the Tool")
         header_content = """
