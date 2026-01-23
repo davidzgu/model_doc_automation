@@ -17,10 +17,16 @@ def main():
     
     with left_col:
         st.header("Tool Name")
-        st.write("BSM Multi-Agent System")
+        st.write("Model Development Ongoing Performance Analysis Report Generator")
         
         st.header("Purpose of the Tool")
-        st.write("This tool uses a multi-agent system to process option trades, validate pricing against BSM models, and automatically generate professional risk reports.")
+        header_content = """
+        This AI Agent workflow automates OPA report drafting process. 
+        The Agent connects to model script, data within timeframe as well as testing script inventory as input. 
+        Based on the model type, Agent selects unique sets of testing script for performance monitoring. 
+        Workflow outpus an OPA report draft in-line with MRM published template, with summary and charts generated automatically.
+        """
+        st.write(header_content)
         
         st.header("Workflow Graph")
         try:
