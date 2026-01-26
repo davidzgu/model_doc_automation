@@ -22,8 +22,8 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
     print("\n>>> [Pricing Validator Agent] Starting validation planning...")
     errors = state.get("errors", [])
 
-    if "greeks_results_path" not in state or not state["greeks_results_path"]:
-        errors.append("pricing_validator_agent_node: greeks_results_path is missing")
+    if "current_file_path" not in state or not state["current_file_path"]:
+        errors.append("pricing_validator_agent_node: current_file_path is missing")
         state["errors"] = errors
         return state
 
@@ -37,38 +37,34 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
     
     local_tool_folder_path = state.get("local_tool_folder_path", None)
     langchain_tools = load_tools_from_mcp_and_local(server_path, local_tool_folder_path)
+    # print(f">>> [Pricing Validator Agent] Loaded {len(langchain_tools)} tools: {[t.name for t in langchain_tools]}")
     
     llm = get_llm().bind_tools(langchain_tools)
     
     # We give the LLM the context (files) and let it choose the tools.
     system_prompt = (
-        "You are a quantitative validator agent. "
-        "You have access to a suite of validation tools via an MCP server. "
-        "Your goal is to perform a comprehensive validation suite on the provided data.\n\n"
-        "REQUIRED INDEPENDENT CHECKS (Execute ALL in parallel):\n"
-        "1. **Greek Range Validation**: Check if Greeks (Delta, Vega, etc.) are within theoretical bounds.\n"
-        "2. **Stress Testing**: Run market scenario simulations to test portfolio resilience.\n"
-        "3. **Convexity Check**: A specialized test to verify Gamma positivity (convexity structure).\n\n"
-        "4. **P&L Attribution**: specific P&L analysis and attribution tests.\n"
-        "CRITICAL INSTRUCTION: \n"
-        "You MUST search for and select the appropriate tool for EACH of the 4 checks above. "
-        "Do not assume one tool covers multiple checks unless explicit. "
-        "**You MUST call ALL necessary tools in a SINGLE turn (in parallel).** "
-        "Generate all tool calls at once."
+        "You are a professional quantitative validator agent. "
+        "Your goal is to validate option results by calling all relevant validation tools in parallel.\n\n"
+        "Instructions:\n"
+        "1. Analyze the input file path provided by the user.\n"
+        "2. Directly call all three tools: 'verify_put_call_parity', 'run_sensitivity_analysis', and 'run_stress_analysis'.\n"
+        "3. Generate all tool calls in a single turn for efficiency.\n"
+        "4. **Argument Note**: For 'run_sensitivity_analysis' and 'run_stress_analysis', you MUST only provide the 'input_path' argument. Skip the 'scenarios' argument entirely to allow the functions to use their high-quality default values.\n"
+        "5. You can provide a brief acknowledgement before naming the tools, but ensure the tool calls are correctly generated."
     )
-    
+
     user_prompt = (
-        f"Input CSV File: {state['greeks_results_path']}\n"
-        f"Output Directory: {output_dir}\n\n"
-        "Please validate the Greeks for the options in the input CSV file. "
-        "Additionally, run stress tests and execute P&L attribution tests using the appropriate tools. "
-        "Save all results to the output directory. "
+        f"The input CSV for validation is located at: {state['current_file_path']}\n\n"
+        "Please run the following validation suite now:\n"
+        "- verify_put_call_parity\n"
+        "- run_sensitivity_analysis\n"
+        "- run_stress_analysis"
+        "do not set scenarios argument if not specified"
     )
 
     messages = list(state.get("messages", []))
     
     # 1. Inject Task (User Prompt) IF NOT returning from a ReAct tool loop.
-    # If the last message is a ToolMessage, we are mid-loop.
     is_tool_return = (len(messages) > 0 and isinstance(messages[-1], ToolMessage))
     
     if not is_tool_return:
@@ -80,9 +76,14 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
     # Invoke
     try:
         ai_msg = llm.invoke(invocation_messages)
+        # Debug: check if ai_msg is empty
+        if not ai_msg.content and (not hasattr(ai_msg, 'tool_calls') or not ai_msg.tool_calls):
+             print(">>> [Pricing Validator Agent] WARNING: LLM returned an empty response!")
+        
         messages.append(ai_msg)
         state["messages"] = messages
-        print(f">>> [Pricing Validator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
+        if hasattr(ai_msg, 'tool_calls'):
+            print(f">>> [Pricing Validator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
     except Exception as e:
         errors.append(f"pricing_validator_agent_node: LLM invocation failed: {e}")
     
@@ -139,7 +140,7 @@ def pricing_validator_tool_node(state: WorkflowState) -> WorkflowState:
             tool_outputs_msgs.append(ToolMessage(content=result_text, tool_call_id=call_id, name=tool_name))
             
             # Generic Output Handling
-            state["validate_results_path"] = result_text.strip()
+            state["current_file_path"] = result_text.strip()
 
         except Exception as e:
             err_msg = f"Error executing {tool_name}: {e}"

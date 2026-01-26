@@ -6,12 +6,12 @@ from typing import Tuple
 from .data_exporter import save_to_local
 from .option_pricer import calc_bsm_price
 
-def verify_put_call_parity(csv_file_path: str) -> str:
+def verify_put_call_parity(input_path: str) -> str:
     """
     Test the Put-Call Parity relationship for a given set of options.
     Formula: C + K * exp(-r * T) = P + S
     Args:
-        csv_file_path (str): Absolute path to the input CSV file. 
+        input_path (str): Absolute path to the input CSV file. 
             Required columns:
             - 'S': Underlying asset price (e.g., 100.50)
             - 'K': Strike price of the option (e.g., 100.00)
@@ -25,7 +25,7 @@ def verify_put_call_parity(csv_file_path: str) -> str:
              plus columns: ['lhs', 'rhs', 'abs_diff', 'is_parity_valid', 'arbitrage_opportunity'].
     """
     # 1. Prepare data
-    df = pd.read_csv(csv_file_path)
+    df = pd.read_csv(input_path)
     S = df['S']
     K = df['K']
     T = df['T']

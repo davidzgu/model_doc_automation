@@ -49,6 +49,7 @@ def get_llm(provider: str = DEFAULT_PROVIDER):
             api_key=api_key,
         )
     elif provider == "google":
+        from langchain_google_genai import HarmCategory, HarmBlockThreshold
         api_key = os.getenv("GOOGLE_API_KEY", DEFAULT_GOOGLE_API_KEY)
         if not api_key:
             raise ValueError(
@@ -57,10 +58,19 @@ def get_llm(provider: str = DEFAULT_PROVIDER):
                 "2. Or set DEFAULT_GOOGLE_API_KEY in llm_config.py (NOT recommended for Git)"
             )
         
+        # Disable safety filters to prevent "Empty Response" errors during quant analysis
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
+
         return ChatGoogleGenerativeAI(
             model=os.getenv("GOOGLE_MODEL", DEFAULT_GOOGLE_MODEL),
             temperature=0,
             google_api_key=api_key,
+            safety_settings=safety_settings
         )
     else:
         # Default: Ollama

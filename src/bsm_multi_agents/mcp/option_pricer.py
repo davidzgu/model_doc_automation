@@ -100,7 +100,7 @@ def calc_bsm_price(
     return np.where(option_type.str.lower() == "call", call_price, put_price)
 
 
-def calculate_option_analytics(csv_file_path: str) -> str:
+def calculate_option_analytics(input_path: str) -> str:
     """
     Perform batch Black-Scholes pricing and Greeks calculation on a CSV file.
 
@@ -109,7 +109,7 @@ def calculate_option_analytics(csv_file_path: str) -> str:
     and returns the absolute path.
 
     Args:
-        csv_file_path (str): Absolute path to the input CSV file. 
+        input_path (str): Absolute path to the input CSV file. 
             Required columns:
             - 'S': Underlying asset price (e.g., 100.50)
             - 'K': Strike price of the option (e.g., 100.00)
@@ -123,7 +123,7 @@ def calculate_option_analytics(csv_file_path: str) -> str:
              plus columns: ['price', 'delta', 'gamma', 'vega', 'theta', 'rho'].
     """
     # Defensive copy to keep the original input state immutable
-    df = pd.read_csv(csv_file_path)
+    df = pd.read_csv(input_path)
     res = df.copy()
     
     # Mapping dataframe columns to local variables for readability

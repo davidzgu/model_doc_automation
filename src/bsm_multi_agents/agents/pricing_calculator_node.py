@@ -47,9 +47,8 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
     )
 
     user_prompt = (
-        f"Input CSV File: {state['csv_file_path']}\n"
-        "Please calculate the Greeks for the options in the input CSV file and save the results. "
-        "Ensure you call the calculation tools."
+        f"Target File: {state['csv_file_path']}\n"
+        "Please calculate the option analytics (price and Greeks) for this file using the calculate_option_analytics tool."
     )
 
     messages = list(state.get("messages", []))
@@ -130,7 +129,7 @@ def pricing_calculator_tool_node(state: WorkflowState) -> WorkflowState:
             tool_outputs_msgs.append(ToolMessage(content=result_text, tool_call_id=call_id, name=tool_name))
             
             # Generic Output Handling: Store by tool name
-            state["greeks_results_path"] = result_text.strip()
+            state["current_file_path"] = result_text.strip()
             
                 
         except Exception as e:
