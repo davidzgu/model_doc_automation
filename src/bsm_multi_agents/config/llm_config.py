@@ -7,7 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 # Set your preferences here (can be overridden by environment variables)
 
 # LLM Provider: "ollama" or "openai" or "google"
-DEFAULT_PROVIDER = "openai"
+DEFAULT_PROVIDER = "ollama"
 
 # Ollama settings
 DEFAULT_OLLAMA_MODEL = "qwen3:32b"
