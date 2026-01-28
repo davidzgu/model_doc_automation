@@ -14,6 +14,7 @@ class WorkflowState(TypedDict, total=False):
 
     # core paths
     csv_file_path: str
+    current_file_path: str  # Dynamically updated by tools to point to latest processed file
     output_dir: str
     server_path: str 
 

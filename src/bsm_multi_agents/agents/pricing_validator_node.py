@@ -68,22 +68,27 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
     is_tool_return = (len(messages) > 0 and isinstance(messages[-1], ToolMessage))
     
     if not is_tool_return:
+        # Clear previous agent's messages to avoid confusion
+        messages = []
         messages.append(HumanMessage(content=user_prompt))
 
     # 2. Prepend System Prompt (Ephemeral)
     invocation_messages = [SystemMessage(content=system_prompt)] + messages
     
+
+    
     # Invoke
     try:
         ai_msg = llm.invoke(invocation_messages)
-        # Debug: check if ai_msg is empty
+        # Check if ai_msg is empty
+        if hasattr(ai_msg, 'tool_calls') and ai_msg.tool_calls:
+            print(f">>> [Pricing Validator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
+            
         if not ai_msg.content and (not hasattr(ai_msg, 'tool_calls') or not ai_msg.tool_calls):
              print(">>> [Pricing Validator Agent] WARNING: LLM returned an empty response!")
         
         messages.append(ai_msg)
         state["messages"] = messages
-        if hasattr(ai_msg, 'tool_calls'):
-            print(f">>> [Pricing Validator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
     except Exception as e:
         errors.append(f"pricing_validator_agent_node: LLM invocation failed: {e}")
     

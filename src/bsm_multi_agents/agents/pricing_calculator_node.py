@@ -60,6 +60,8 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
     is_tool_return = (len(messages) > 0 and isinstance(messages[-1], ToolMessage))
     
     if not is_tool_return:
+        # Clear previous messages to start fresh with this agent's task
+        messages = []
         messages.append(HumanMessage(content=user_prompt))
 
     # 2. Prepend System Prompt (Ephemeral: sent to LLM but not saved to state history)
@@ -71,7 +73,12 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
         ai_msg = llm.invoke(invocation_messages)
         messages.append(ai_msg)
         state["messages"] = messages
-        print(f">>> [Pricing Calculator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
+        
+        # Defensive check before accessing tool_calls
+        if hasattr(ai_msg, 'tool_calls') and ai_msg.tool_calls:
+            print(f">>> [Pricing Calculator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
+        else:
+            print(f">>> [Pricing Calculator Agent] Completed task, moving to next stage")
     except Exception as e:
         errors.append(f"pricing_calculator_agent_node: LLM invocation failed: {e}")
     
@@ -124,7 +131,6 @@ def pricing_calculator_tool_node(state: WorkflowState) -> WorkflowState:
                 raw_result = call_mcp_tool(tool_name, server_path, args)
                 result_text = extract_mcp_content(raw_result)
 
-            
             # Create ToolMessage
             tool_outputs_msgs.append(ToolMessage(content=result_text, tool_call_id=call_id, name=tool_name))
             
