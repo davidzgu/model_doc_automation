@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 import os
+from dotenv import load_dotenv
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+
+# Load environment variables from .env file
+load_dotenv()
+
 # ========== CONFIGURATION ==========
 # Set your preferences here (can be overridden by environment variables)
 
@@ -35,7 +40,7 @@ def get_llm(provider: str = DEFAULT_PROVIDER):
     3. Use Google: Set environment variable LLM_PROVIDER=google
     """
     if provider == "openai":
-        api_key = os.getenv("OPENAI_API_KEY", DEFAULT_OPENAI_API_KEY)
+        api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError(
                 "OPENAI_API_KEY not set. Either:\n"

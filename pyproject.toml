@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
     "asyncio>=4.0.0",
     "beautifulsoup4>=4.14.2",
+    "docker>=7.1.0",
     "ipykernel>=7.1.0",
     "langchain>=1.0.2",
     "langchain-core>=1.0.1",
@@ -26,6 +27,7 @@ dependencies = [
     "pandas>=2.3.3",
     "pydantic>=2.12.3",
     "python-docx>=1.2.0",
+    "python-dotenv>=1.2.1",
     "scipy>=1.16.2",
     "seaborn>=0.13.2",
     "streamlit>=1.53.0",
