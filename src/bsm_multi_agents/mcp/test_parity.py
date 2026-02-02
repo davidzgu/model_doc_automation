@@ -69,4 +69,10 @@ def verify_put_call_parity(input_path: str) -> str:
     
     result_df = pairs
 
-    return save_to_local(result_df, folder_name="analytics", prefix="put_call_parity")
+    output_path = save_to_local(
+        result_df, 
+        folder_name="analytics", 
+        prefix="put_call_parity"
+    )
+    
+    return output_path
