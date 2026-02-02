@@ -1,7 +1,46 @@
-from typing import Union, Dict, Any, List, Annotated
+from typing import Union, Dict, Any, List, Annotated, Optional
 import json
 import pandas as pd
 import os
+import numpy as np
+from scipy.stats import norm
+from datetime import datetime, timedelta
+
+
+DEFAULT_STRESS_SCENARIOS = [
+    {"name": "Black Monday (1987)", "spot_change": -0.20, "vol_change": 0.50, "rate_change": -0.005},
+    {"name": "Dot-com Crash (2000)", "spot_change": -0.70, "vol_change": 2.00, "rate_change": -0.02},
+    {"name": "2008 Financial Crisis", "spot_change": -0.50, "vol_change": 1.50, "rate_change": -0.01},
+    {"name": "VIX Spike (No Stock Move)", "spot_change": 0.0, "vol_change": 1.00, "rate_change": 0.0},
+    {"name": "Rate Shock (+200bps)", "spot_change": 0.0, "vol_change": 0.0, "rate_change": 0.02},
+    {"name": "Liquidation Scenario", "spot_change": -0.30, "vol_change": 3.00, "rate_change": 0.01},
+    {"name": "Volatility Collapse", "spot_change": 0.05, "vol_change": -0.50, "rate_change": 0.0},
+]
+
+
+DEFAULT_SENSITIVITY_SCENARIOS = [
+    {"name": "spot_bump_-0.05", "spot_change": -0.05},
+    {"name": "spot_bump_-0.02", "spot_change": -0.02},
+    {"name": "spot_bump_-0.01", "spot_change": -0.01},
+    {"name": "spot_bump_0", "spot_change": 0.0},
+    {"name": "spot_bump_0.01", "spot_change": 0.01},
+    {"name": "spot_bump_0.02", "spot_change": 0.02},
+    {"name": "spot_bump_0.05", "spot_change": 0.05},
+    {"name": "vol_bump_-0.05", "vol_change": -0.05},
+    {"name": "vol_bump_-0.02", "vol_change": -0.02},    
+    {"name": "vol_bump_-0.01", "vol_change": -0.01},
+    {"name": "vol_bump_0", "vol_change": 0.0},
+    {"name": "vol_bump_0.01", "vol_change": 0.01},
+    {"name": "vol_bump_0.02", "vol_change": 0.02},
+    {"name": "vol_bump_0.05", "vol_change": 0.05},
+    {"name": "rate_bump_-0.05", "rate_change": -0.05},
+    {"name": "rate_bump_-0.02", "rate_change": -0.02},
+    {"name": "rate_bump_-0.01", "rate_change": -0.01},
+    {"name": "rate_bump_0", "rate_change": 0.0},
+    {"name": "rate_bump_0.01", "rate_change": 0.01},
+    {"name": "rate_bump_0.02", "rate_change": 0.02},
+    {"name": "rate_bump_0.05", "rate_change": 0.05},
+]
 
 
 def _validate_greeks_rules(
@@ -69,6 +108,9 @@ def _validate_greeks_rules(
     }
     return results
 
+# ============================================================================
+# Simple TEST
+# ============================================================================
 
 def validate_greeks_to_file(
     input_path: str, output_dir: str
@@ -129,262 +171,404 @@ def validate_greeks_to_file(
 
 
 # ============================================================================
-# SENSITIVITY TEST (Wraps run_sensitivity_test from tools)
+# Sensitivity TEST 
 # ============================================================================
 
+def _calculate_scenario_attribution(
+    row: pd.Series,
+    scenario: Dict[str, float],
+) -> Dict[str, float]:
+    """
+    Calculate P&L and Greek attribution for a single market scenario.
+
+    Computes the actual P&L (based on BSM pricing) and compares it with
+    the estimated P&L derived from Greeks (Delta, Gamma, Vega, Theta).
+
+    Args:
+        row (pd.Series): A row containing option parameters (S, K, T, r, sigma, option_type).
+        scenario (Dict[str, float]): A dictionary defining the market move (spot_change, vol_change, etc.).
+
+    Returns:
+        Dict[str, float]: A dictionary containing actual P&L, estimated P&L, attribution components, and error metrics.
+    """
+    opt_type = row['option_type']
+    S_base = float(row['S'])
+    K_base = float(row['K'])
+    T_base = float(row['T'])
+    r_base = float(row['r'])
+    sigma_base = float(row['sigma'])
+
+    # Base case
+    V_base = _bsm_price(opt_type, S_base, K_base, T_base, r_base, sigma_base)
+    delta_base = _bsm_delta(opt_type, S_base, K_base, T_base, r_base, sigma_base)
+    gamma_base = _bsm_gamma(S_base, K_base, T_base, r_base, sigma_base)
+    vega_base = _bsm_vega(S_base, K_base, T_base, r_base, sigma_base)
+    theta_base = _bsm_theta(opt_type, S_base, K_base, T_base, r_base, sigma_base)
+
+    scenario_name = scenario.get('name', 'Unknown')
+    spot_change = scenario.get('spot_change', 0.0)
+    vol_change = scenario.get('vol_change', 0.0)
+    days_passed = scenario.get('days_passed', 0.0)
+    rate_change = scenario.get('rate_change', 0.0)
+
+    S_stress = S_base*(1+spot_change)
+    sigma_stress = np.maximum(0.001, sigma_base + vol_change)
+    T_stress = max(0, T_base - days_passed / 365.0)
+    r_stress = r_base + rate_change
+
+    # New option price
+    V_stress = _bsm_price(opt_type, S_stress, K_base, T_stress, r_stress, sigma_stress)
+    actual_pnl = V_stress - V_base
+    pnl_pct = np.where(V_base != 0, (actual_pnl / V_base * 100), 0.0)
+
+    # Greeks-based P&L estimate
+    spot_move = S_stress - S_base
+    vol_move = sigma_stress - sigma_base
+    rate_move = r_stress - r_base
+    time_decay = days_passed / 365.0
+
+    # P&L components
+    delta_pnl = delta_base * spot_move
+    gamma_pnl = 0.5 * gamma_base * (spot_move ** 2)
+    vega_pnl = vega_base * vol_move
+    theta_pnl = theta_base * time_decay
+
+    # Total estimated P&L
+    estimated_pnl = delta_pnl + gamma_pnl + vega_pnl + theta_pnl
+    pnl_error = actual_pnl - estimated_pnl
+
+    # Realized variance (gamma P&L proxy)
+    realized_var = (spot_move / S_base) ** 2 if S_base != 0 else 0
+
+    # Delta-hedged P&L (excluding delta component)
+    hedged_pnl = gamma_pnl + vega_pnl + theta_pnl
+
+    result = {
+        # Scenario Info
+        "scenario_name": scenario_name,
+        "scen_spot_change": spot_change,
+        "scen_vol_change": vol_change,
+        "scen_time_step": days_passed, 
+        "scen_rate_change": rate_change,
+        
+        # Prices
+        "base_price": V_base,
+        "new_price": V_stress,
+        
+        # PnL Attribution
+        "actual_pnl": actual_pnl,
+        "pnl_pct": pnl_pct,
+        "delta_pnl": delta_pnl,
+        "gamma_pnl": gamma_pnl,
+        "vega_pnl": vega_pnl,
+        "theta_pnl": theta_pnl,
+        "estimated_pnl": estimated_pnl,
+        "pnl_error": pnl_error,
+        "realized_variance": realized_var,
+        "delta_hedged_pnl": hedged_pnl
+    }
+
+    return result
+
+def _run_sensitivity_test_on_single_trade(
+    row: pd.Series,
+    scenarios: List[Dict] = DEFAULT_SENSITIVITY_SCENARIOS,
+) -> List[Dict]:
+    """
+    Run sensitivity analysis for a SINGLE trade across multiple scenarios.
+    Returns a list of dictionaries, where each dictionary is a flattened row 
+    containing BOTH the original trade info and the scenario results.
+    """
+    results = []
+    
+    # Convert original trade row to dict to preserve its info
+    trade_info = row.to_dict()
+    
+    for sc in scenarios:
+        # Calculate PnL/Attribution for this scenario
+        attribution = _calculate_scenario_attribution(row, sc)
+        
+        # Merge: Trade Info + Scenario Results
+        # Note: If keys collide (unlikely given naming), attribution overwrites trade_info.
+        # usually trade_info has 'S', 'vol', etc. attribution has 'scen_spot_change', etc.
+        combined_record = {**trade_info, **attribution}
+        results.append(combined_record)
+    
+    return results
+
 def run_sensitivity_test_to_file(
-    input_path: str, output_dir: str
+    input_path: str, 
+    output_dir: str,
+    scenarios: List[Dict] = DEFAULT_SENSITIVITY_SCENARIOS,
 ) -> str:
     """
-    Run sensitivity tests for all options in CSV using spot/vol bumps.
-    
-    For each option (first row):
-    - Analyzes spot price sensitivity
-    - Analyzes volatility sensitivity
-    - Tests parallel yield curve shifts
-    
+    Execute P&L attribution tests for all options in a CSV file.
+    Output is in LONG format: One row per trade per scenario.
+
     Args:
-        input_path: Path to CSV with option parameters
-        output_dir: Directory to save results
-    
+        input_path (str): Absolute path to the input CSV file containing option data.
+        output_dir (str): Directory where the output CSV will be saved.
+        scenarios List[Dict]: List of scenarios to test. Defaults to DEFAULT_SENSITIVITY_SCENARIOS.
+
     Returns:
-        JSON string with test results and output file path
+        str: The absolute path to the generated result file.
     """
     try:
         if not os.path.exists(input_path):
-            return json.dumps({"errors": [f"Input file not found at {input_path}"]})
+            return f"Input file not found at {input_path}"
         
         df = pd.read_csv(input_path)
         if df.empty:
-            return json.dumps({"errors": ["CSV is empty"]})
+            return f"CSV is empty"
         
         required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
-            return json.dumps({"errors": [f"Missing columns: {missing}"]})
+            return f"Missing columns: {missing}"
         
-        # Use first row as representative option
-        row = df.iloc[0].to_dict()
-        option_json = json.dumps({
-            "option_type": row.get('option_type'),
-            "S": float(row.get('S')),
-            "K": float(row.get('K')),
-            "T": float(row.get('T')),
-            "r": float(row.get('r', 0.0)),
-            "sigma": float(row.get('sigma'))
-        })
+        # Iterate over all trades calculate results
+        all_results = []
+        for _, row in df.iterrows():
+            trade_results = _run_sensitivity_test_on_single_trade(row, scenarios)
+            all_results.extend(trade_results)
+            
+        # Create final DataFrame from list of dicts
+        final_df = pd.DataFrame(all_results)
         
-        # Import and run test
-        from bsm_multi_agents.tools.test_generator_tools import run_sensitivity_test as _run_sens
-        test_result = _run_sens(option_json, output_dir=output_dir)
-        test_data = json.loads(test_result)
-        
-        # Append test summary to results CSV
-        os.makedirs(output_dir, exist_ok=True)
         filename = os.path.basename(input_path).replace(".csv", "_sensitivity_test_results.csv")
         output_path = os.path.join(output_dir, filename)
         
-        summary = {
-            "test_type": "sensitivity",
-            "timestamp": datetime.now().isoformat(),
-            "base_price": test_data.get('base_price'),
-            "delta": test_data.get('base_greeks', {}).get('delta'),
-            "gamma": test_data.get('base_greeks', {}).get('gamma'),
-            "vega": test_data.get('base_greeks', {}).get('vega'),
-            "status": "passed" if test_data.get('success') else "failed",
-            "output_file": test_data.get('output_file', 'N/A')
-        }
+        # Save without index (row number is meaningless in long format)
+        os.makedirs(output_dir, exist_ok=True)
+        final_df.to_csv(output_path, index=False)
         
-        summary_df = pd.DataFrame([summary])
-        summary_df.to_csv(output_path, index=False)
-        
-        return json.dumps({
-            "success": True,
-            "test_type": "sensitivity",
-            "output_file": os.path.abspath(output_path),
-            "test_details": test_data
-        })
+        return os.path.abspath(output_path)
     
     except Exception as e:
-        return json.dumps({"errors": [f"Sensitivity test error: {str(e)}"]})
-
-
+        return f"P&L test error: {str(e)}"
 
 
 # ============================================================================
-# STRESS TEST (Wraps run_stress_test from tools)
+# GAMMA POSITIVE TEST 
 # ============================================================================
 
-def run_stress_test_to_file(
-    input_path: str, output_dir: str
+
+def _run_gamma_positivity_test(row: pd.Series) -> bool:
+    """
+    Check if the Gamma of an option is positive (convexity check).
+    
+    This function validates the fundamental property that long vanilla options 
+    should have positive Gamma (convexity) by verifying that:
+    V(S+h) + V(S-h) - 2V(S) > 0
+
+    Args:
+        row (pd.Series): A row containing option parameters:
+            - 'option_type': 'call' or 'put'
+            - 'S': Spot price
+            - 'K': Strike price
+            - 'T': Time to maturity
+            - 'r': Risk-free rate
+            - 'sigma': Volatility
+
+    Returns:
+        bool: True if Gamma is positive (convex), False otherwise.
+    """
+
+    opt_type = row['option_type']
+    S0 = float(row['S'])
+    K = float(row['K'])
+    T0 = float(row['T'])
+    r = float(row['r'])
+    sigma0 = float(row['sigma'])
+
+    V0 = _bsm_price(opt_type, S0, K, T0, r, sigma0)
+
+    # Bump prices up and down by 1%
+    bump = S0 * 0.01
+    V_up = _bsm_price(opt_type, S0 + bump, K, T0, r, sigma0)
+    V_down = _bsm_price(opt_type, S0 - bump, K, T0, r, sigma0)
+
+    # Check gamma positivity condition
+    gamma_condition = V_up + V_down - 2 * V0
+    return gamma_condition > 0
+
+def run_gamma_positivity_test_to_file(
+    input_path: str, 
+    output_dir: str,
 ) -> str:
     """
-    Run stress tests for all options in CSV using extreme scenarios.
-    
-    For each option (first row):
-    - Tests Black Monday scenario (-20% stock, +50% vol)
-    - Tests Dot-com scenario (-70% stock, +200% vol)
-    - Tests 2008 Crisis scenario (-50% stock, +150% vol)
-    - Tests VIX spike (0% stock, +100% vol)
-    - Tests rate shock (+200bps)
-    - Tests liquidation scenario (-30% stock, +300% vol)
-    
+    Execute the specialized Gamma Positivity (Convexity) Test Suite.
+
+    This is a distinct stress test that verifies the fundamental no-arbitrage
+    condition of option convexity: V(S+h) + V(S-h) - 2V(S) > 0.
+    It performs a bump-and-reprice analysis which is independent of the 
+    standard Greek range validation.
+
     Args:
-        input_path: Path to CSV with option parameters
-        output_dir: Directory to save results
-    
+        input_path (str): Absolute path to the input CSV file containing option parameters.
+        output_dir (str): Directory where the output CSV will be saved.
+
     Returns:
-        JSON string with stress test results and output file path
+        str: Absolute path to the generated results file.
     """
     try:
         if not os.path.exists(input_path):
-            return json.dumps({"errors": [f"Input file not found at {input_path}"]})
+            return f"Input file not found at {input_path}"
         
         df = pd.read_csv(input_path)
         if df.empty:
-            return json.dumps({"errors": ["CSV is empty"]})
+            return f"CSV is empty"
         
         required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
-            return json.dumps({"errors": [f"Missing columns: {missing}"]})
+            return f"Missing columns: {missing}"
         
-        # Use first row as representative option
-        row = df.iloc[0].to_dict()
-        option_json = json.dumps({
-            "option_type": row.get('option_type'),
-            "S": float(row.get('S')),
-            "K": float(row.get('K')),
-            "T": float(row.get('T')),
-            "r": float(row.get('r', 0.0)),
-            "sigma": float(row.get('sigma'))
-        })
+        results = df.apply(lambda r: _run_gamma_positivity_test(r), axis=1)
+        summary_df = df.copy()
+        summary_df['gamma_positivity'] = results
         
-        # Import and run test
-        from bsm_multi_agents.tools.test_generator_tools import run_stress_test as _run_stress
-        test_result = _run_stress(option_json, output_dir=output_dir)
-        test_data = json.loads(test_result)
-        
-        # Append test summary to results CSV
-        os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.basename(input_path).replace(".csv", "_stress_test_results.csv")
+        filename = os.path.basename(input_path).replace(".csv", "_gamma_positivity_test_results.csv")
         output_path = os.path.join(output_dir, filename)
         
-        worst_case = test_data.get('worst_case', {})
-        summary = {
-            "test_type": "stress",
-            "timestamp": datetime.now().isoformat(),
-            "base_price": test_data.get('base_price'),
-            "num_scenarios": test_data.get('num_scenarios'),
-            "worst_case_scenario": worst_case.get('scenario_name'),
-            "worst_case_pnl": worst_case.get('pnl'),
-            "worst_case_pnl_pct": worst_case.get('pnl_pct'),
-            "status": "passed" if test_data.get('success') else "failed",
-            "output_file": test_data.get('output_file', 'N/A')
-        }
-        
-        summary_df = pd.DataFrame([summary])
         summary_df.to_csv(output_path, index=False)
         
-        return json.dumps({
-            "success": True,
-            "test_type": "stress",
-            "output_file": os.path.abspath(output_path),
-            "test_details": test_data
-        })
+        return os.path.abspath(output_path)
     
     except Exception as e:
-        return json.dumps({"errors": [f"Stress test error: {str(e)}"]})
+        return f"Gamma test error: {str(e)}"
+
 
 
 # ============================================================================
-# P&L ANALYSIS TEST (Wraps run_pnl_test from tools)
+# SENSITIVITY TEST
 # ============================================================================
 
-def run_pnl_test_to_file(
-    input_path: str, output_dir: str
-) -> str:
-    """
-    Run P&L analysis and attribution tests for all options in CSV.
+
+# def run_stress_test_to_file(
+#     input_path: str, output_dir: str,
+#     scenarios: List[Dict] = DEFAULT_SCENARIOS
+# ) -> str:
+#     """
+#     Run stress tests for all options in CSV using extreme market scenarios.
     
-    For each option (first row):
-    - Analyzes Greeks-based P&L estimates vs. actual P&L
-    - Tests P&L attribution (delta, gamma, vega, theta)
-    - Tests gamma P&L (realized variance impact)
-    - Tests delta-hedged returns
+#     Args:
+#         input_path: Path to CSV with option parameters
+#         output_dir: Directory to save results
+#         scenarios List[Dict]: List of scenarios to test. Defaults to DEFAULT_SCENARIOS.
     
-    Args:
-        input_path: Path to CSV with option parameters
-        output_dir: Directory to save results
+#     Returns:
+#         Absolute path to the resulting CSV file
+#     """
+
+#     try:
+#         if not os.path.exists(input_path):
+#             return f"Error: Input file not found at {input_path}"
+        
+#         df = pd.read_csv(input_path)
+#         if df.empty:
+#             return "Error: CSV is empty"
+        
+#         # skip duplicate rows as requested
+#         df = df.drop_duplicates().reset_index(drop=True)
+        
+#         required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
+#         missing = [c for c in required_cols if c not in df.columns]
+#         if missing:
+#             return f"Error: Missing columns: {missing}"
+        
+#         # Pre-calculate base price once
+#         df['base_price'] = _bsm_price(df['option_type'], df['S'], df['K'], df['T'], df['r'], df['sigma'])
+
+#         pnl_cols = []
+#         scenario_results = []
+#         for scenario in scenarios:
+#             res_df = _run_stress_test(df, scenario)
+#             scenario_results.append(res_df)
+#             pnl_cols.append(f"{scenario['name']}_PnL")
+        
+#         # Merge all results horizontally
+#         final_df = pd.concat([df] + scenario_results, axis=1)
+        
+#         # Identify worst-case scenario per row
+#         # idxmin skips NaNs by default. If all are NaN, it returns NaN.
+#         final_df['worst_case_col'] = final_df[pnl_cols].idxmin(axis=1)
+#         final_df['worst_case_pnl'] = final_df[pnl_cols].min(axis=1)
+        
+#         # Handle scenario name extraction safely
+#         def get_worst_scenario_name(col_val):
+#             if pd.isna(col_val):
+#                 return "None"
+#             return str(col_val).replace("_PnL", "")
+
+#         final_df['worst_case_scenario'] = final_df['worst_case_col'].apply(get_worst_scenario_name)
+        
+#         # Get worst case PnL% safely
+#         def get_worst_pnl_pct(row):
+#             scen = row['worst_case_scenario']
+#             if scen == "None":
+#                 return np.nan
+#             col_name = f"{scen}_PnL%"
+#             return row.get(col_name, np.nan)
+
+#         final_df['worst_case_pnl_pct'] = final_df.apply(get_worst_pnl_pct, axis=1)
+        
+#         # Clean up temporary column
+#         final_df = final_df.drop(columns=['worst_case_col'])
+        
+#         # Save results
+#         os.makedirs(output_dir, exist_ok=True)
+#         filename = os.path.basename(input_path).replace(".csv", f"_stress_test_results.csv")
+#         output_path = os.path.join(output_dir, filename)
+        
+#         final_df.to_csv(output_path, index=False)
+        
+#         return os.path.abspath(output_path)
     
-    Returns:
-        JSON string with P&L test results and output file path
-    """
-    try:
-        if not os.path.exists(input_path):
-            return json.dumps({"errors": [f"Input file not found at {input_path}"]})
-        
-        df = pd.read_csv(input_path)
-        if df.empty:
-            return json.dumps({"errors": ["CSV is empty"]})
-        
-        required_cols = ['option_type', 'S', 'K', 'T', 'r', 'sigma']
-        missing = [c for c in required_cols if c not in df.columns]
-        if missing:
-            return json.dumps({"errors": [f"Missing columns: {missing}"]})
-        
-        # Use first row as representative option
-        row = df.iloc[0].to_dict()
-        option_json = json.dumps({
-            "option_type": row.get('option_type'),
-            "S": float(row.get('S')),
-            "K": float(row.get('K')),
-            "T": float(row.get('T')),
-            "r": float(row.get('r', 0.0)),
-            "sigma": float(row.get('sigma'))
-        })
-        
-        # Default market moves for test
-        moves_json = json.dumps([
-            {"spot": float(row.get('S')) * 1.01, "vol": float(row.get('sigma')) + 0.01, "days_passed": 1, "rate": float(row.get('r', 0.0))},
-            {"spot": float(row.get('S')) * 0.99, "vol": float(row.get('sigma')) - 0.01, "days_passed": 1, "rate": float(row.get('r', 0.0))},
-        ])
-        
-        # Import and run test
-        from bsm_multi_agents.tools.test_generator_tools import run_pnl_test as _run_pnl
-        test_result = _run_pnl(option_json, moves_json, output_dir=output_dir)
-        test_data = json.loads(test_result)
-        
-        # Append test summary to results CSV
-        os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.basename(input_path).replace(".csv", "_pnl_test_results.csv")
-        output_path = os.path.join(output_dir, filename)
-        
-        summary_stats = test_data.get('summary', {})
-        summary = {
-            "test_type": "pnl_analysis",
-            "timestamp": datetime.now().isoformat(),
-            "base_price": test_data.get('base_greeks', {}).get('BSM_price'),
-            "base_delta": test_data.get('base_greeks', {}).get('delta'),
-            "base_gamma": test_data.get('base_greeks', {}).get('gamma'),
-            "base_vega": test_data.get('base_greeks', {}).get('vega'),
-            "base_theta": test_data.get('base_greeks', {}).get('theta'),
-            "num_scenarios": summary_stats.get('num_scenarios'),
-            "avg_pnl_error": summary_stats.get('avg_pnl_error'),
-            "max_pnl_error": summary_stats.get('max_pnl_error'),
-            "status": "passed" if test_data.get('success') else "failed",
-            "output_file": test_data.get('output_file', 'N/A')
-        }
-        
-        summary_df = pd.DataFrame([summary])
-        summary_df.to_csv(output_path, index=False)
-        
-        return json.dumps({
-            "success": True,
-            "test_type": "pnl_analysis",
-            "output_file": os.path.abspath(output_path),
-            "test_details": test_data
-        })
+#     except Exception as e:
+#         return f"Error: Stress test execution failed: {str(e)}"
+
+# def _summarize_pnl_scenarios(
+#     row: pd.Series,
+#     scenarios: List[Dict] | None = None,
+# ) -> pd.Series:
+#     """
+#     Run multiple P&L scenarios for a single option and calculate summary metrics.
+
+#     Aggregates results across all provided scenarios to find average/max/min P&L
+#     and errors to evaluate pricing model stability or hedging effectiveness.
+
+#     Args:
+#         row (pd.Series): A row containing option parameters.
+#         scenarios (List[Dict] | None): A list of scenario dictionaries. Defaults to global DEFAULT_SCENARIOS.
+
+#     Returns:
+#         pd.Series: Summary statistics including num_scenarios, avg_actual_pnl, max_pnl_error, etc.
+#     """
+#     if not scenarios:
+#         # Default market moves for demonstration
+#         scenarios = DEFAULT_PNL_SCENARIOS
     
-    except Exception as e:
-        return json.dumps({"errors": [f"P&L test error: {str(e)}"]})
+#     details = [_calculate_scenario_pnl(row, s) for s in scenarios]
+
+#     num_scenarios = len(details)
+#     avg_actual_pnl = np.mean([d['actual_pnl'] for d in details])
+#     max_actual_pnl = np.max([d['actual_pnl'] for d in details])
+#     min_actual_pnl = np.min([d['actual_pnl'] for d in details])
+#     avg_pnl_error = np.mean([d['pnl_error'] for d in details])
+#     max_pnl_error = np.max(np.abs([d['pnl_error'] for d in details]))
+#     avg_delta_hedged_pnl = np.mean([d['delta_hedged_pnl'] for d in details])
+    
+    
+#     return pd.Series({
+#         'num_scenarios': num_scenarios,
+#         'avg_actual_pnl': avg_actual_pnl,
+#         'max_actual_pnl': max_actual_pnl,
+#         'min_actual_pnl': min_actual_pnl,
+#         'avg_pnl_error': avg_pnl_error,
+#         'max_pnl_error': max_pnl_error,
+#         'avg_delta_hedged_pnl': avg_delta_hedged_pnl,
+#         'details': details
+#     })
+
+

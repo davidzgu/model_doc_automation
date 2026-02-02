@@ -42,31 +42,43 @@ def pricing_calculator_agent_node(state: WorkflowState) -> WorkflowState:
     system_prompt = (
         "You are a quantitative calculator agent. "
         "You have access to tools specifically for Greeks calculation via an MCP server, as well as local math tools. "
-        "You operate in a ReAct loop: you can call a tool, see the result, and then decide to call another tool or finish. "
         "Use the available tools to process these requests sequentially or in parallel if appropriate. "
-        "If you have multiple distinct tasks (e.g. Calculate A, then Calculate B), handle them one by one or together.\n"
         "IMPORTANT: When you have completed ALL requested tasks and saved the results, you MUST output a final text response (e.g. 'Calibration and calculation complete.') with NO tool calls. This will signal the workflow to proceed."
     )
-    
+
     user_prompt = (
-        f"Input CSV File: {state['csv_file_path']}\n"
-        f"Output Directory: {output_dir}\n\n"
-        "Please calculate the Greeks for the options in the input CSV file. "
-        "Save the results to the output directory. "
-        "Ensure you call the calculation tools."
+        f"Target File: {state['csv_file_path']}\n"
+        "Please calculate the option analytics (price and Greeks) for this file using the calculate_option_analytics tool."
     )
 
     messages = list(state.get("messages", []))
-    messages.append(SystemMessage(content=system_prompt))
-    messages.append(HumanMessage(content=user_prompt))
+    
+    # 1. Inject Task (User Prompt) IF NOT returning from a tool call.
+    # We assume if the last message is a ToolMessage, we are in the middle of a loop 
+    # and don't need to re-state the objective.
+    # Otherwise (empty history, or returning from another agent), we append the task.
+    is_tool_return = (len(messages) > 0 and isinstance(messages[-1], ToolMessage))
+    
+    if not is_tool_return:
+        # Clear previous messages to start fresh with this agent's task
+        messages = []
+        messages.append(HumanMessage(content=user_prompt))
+
+    # 2. Prepend System Prompt (Ephemeral: sent to LLM but not saved to state history)
+    invocation_messages = [SystemMessage(content=system_prompt)] + messages
          
     
     # Invoke
     try:
-        ai_msg = llm.invoke(messages)
+        ai_msg = llm.invoke(invocation_messages)
         messages.append(ai_msg)
         state["messages"] = messages
-        print(f">>> [Pricing Calculator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
+        
+        # Defensive check before accessing tool_calls
+        if hasattr(ai_msg, 'tool_calls') and ai_msg.tool_calls:
+            print(f">>> [Pricing Calculator Agent] Decide to use tools: {[tool['name'] for tool in ai_msg.tool_calls]}")
+        else:
+            print(f">>> [Pricing Calculator Agent] Completed task, moving to next stage")
     except Exception as e:
         errors.append(f"pricing_calculator_agent_node: LLM invocation failed: {e}")
     
@@ -119,12 +131,11 @@ def pricing_calculator_tool_node(state: WorkflowState) -> WorkflowState:
                 raw_result = call_mcp_tool(tool_name, server_path, args)
                 result_text = extract_mcp_content(raw_result)
 
-            
             # Create ToolMessage
             tool_outputs_msgs.append(ToolMessage(content=result_text, tool_call_id=call_id, name=tool_name))
             
             # Generic Output Handling: Store by tool name
-            state["greeks_results_path"] = result_text.strip()
+            state["current_file_path"] = result_text.strip()
             
                 
         except Exception as e:
