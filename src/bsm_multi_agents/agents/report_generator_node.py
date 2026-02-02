@@ -76,6 +76,9 @@ def report_generator_agent_node(state: WorkflowState) -> WorkflowState:
         stress_test_results_sub = stress_test_results[stress_test_results["asset_class"] == asset]
         put_call_parity_sub = put_call_parity[put_call_parity["asset_class_put"] == asset]
         
+        print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section 2.{section_ordering}: {asset} summary table...")
+        _generate_summary_table(doc, section_ordering, asset)
+
         print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section 2.{section_ordering}: {asset} pricing summary...")
         _generate_pricing_summary(doc, llm, asset, df_pricing_sub, section_ordering)
         
@@ -160,6 +163,45 @@ def _add_section_1(doc, heading: str, paragraph: Optional[str]):
 
     doc.add_heading(heading, level=1)
     doc.add_paragraph(paragraph)
+
+
+
+def _generate_summary_table(doc, section_ordering: int, asset: str):
+    """
+    Generates a summary table with 4 columns:
+    1. Seq #
+    2. Test
+    3. Material
+    4. Test Conclusion
+    """
+    doc.add_heading(f"2.{section_ordering} Summary Table for {asset}", level=2)
+    
+    table = doc.add_table(rows=1, cols=4)
+    table.style = 'Table Grid'
+    
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Seq #'
+    hdr_cells[1].text = 'Test'
+    hdr_cells[2].text = 'Material'
+    hdr_cells[3].text = 'Test Conclusion'
+    
+    # Define the rows content
+    # Note: The subsection numbering in Material column should match the generated sections
+    rows_data = [
+        ("1", "Pricing Summary", f"See Section 2.{section_ordering}.1", ""),
+        ("2", "Sensitivity Test Summary", f"See Section 2.{section_ordering}.2", ""),
+        ("3", "Stress Test Summary", f"See Section 2.{section_ordering}.3", ""),
+        ("4", "Put-Call Parity Summary", f"See Section 2.{section_ordering}.4", ""),
+    ]
+    
+    for seq, test_name, material, conclusion in rows_data:
+        row_cells = table.add_row().cells
+        row_cells[0].text = seq
+        row_cells[1].text = test_name
+        row_cells[2].text = material
+        row_cells[3].text = conclusion  # Placeholder
+
+    doc.add_paragraph("")  # Spacer after table
 
 
 def _generate_pricing_summary(doc, llm, asset: str, df: pd.DataFrame, section_ordering: int):
