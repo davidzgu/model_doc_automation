@@ -19,7 +19,7 @@ def main():
     output_dir = str(project_path / "data/cache")
     server_path = str(project_path / "src/bsm_multi_agents/mcp/server.py")
     local_tool_folder_path = os.path.join(project_path, "src/bsm_multi_agents/tools")
-    final_report_path = str(project_path / "data/output/final_report2.docx")
+    final_report_path = str(project_path / "data/output/final_report.docx")
 
     initial_state = WorkflowState(
         csv_file_path=csv_file_path,
