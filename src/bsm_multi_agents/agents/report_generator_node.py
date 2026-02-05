@@ -57,30 +57,49 @@ def report_generator_agent_node(state: WorkflowState) -> WorkflowState:
     _add_title_page(doc, report_params)
 
     # 2. Section 1
-    print(">>>>>> [Report Generator Agent] Compiling section 1...")
-    _add_section_1(doc, "1. Introduction", None)
+    section_ordering = 1
+    print(">>>>>> [Report Generator Agent] Compiling section {section_ordering}...")
+    _add_section_1(doc, f"{section_ordering}. Introduction", None)
 
     # 3. Section 2 (Loop per asset)
-    print(">>>>>> [Report Generator Agent] Compiling section 2...")
-    doc.add_heading("2. Summary of Analysis", level=1)
+    section_ordering = 2
+    print(f">>>>>> [Report Generator Agent] Compiling section {section_ordering}...")
+    doc.add_heading(f"{section_ordering}. Summary of Analysis", level=1)
     
-    section_ordering = 0
-    # Assuming df_pricing has asset_class column. If not present in all rows, might crash.
-    # We loop specific assets as per original code.
+    print(f">>>>>>>>> [Report Generator Agent] Compiling section {section_ordering}: summary table...")
+    
+    asset = "Equity"
+    df_pricing_sub = df_pricing[df_pricing["asset_class"] == asset]
+    sensitivity_test_results_sub = sensitivity_test_results[sensitivity_test_results["asset_class"] == asset]
+    stress_test_results_sub = stress_test_results[stress_test_results["asset_class"] == asset]
+    put_call_parity_sub = put_call_parity[put_call_parity["asset_class_put"] == asset]
+
+    _generate_summary_table(doc, section_ordering = section_ordering, asset=asset)
+    doc.add_paragraph("")
+
+    subsection_level = 2
+    subsection_ordering = f"{section_ordering}.1"
+    print(f">>>>>>>>> [Report Generator Agent] Compiling section {subsection_ordering}: Diagnostic Test...")
+    _generate_dignostic_summary(
+        doc, 
+        llm, 
+        asset, 
+        df_pricing=df_pricing_sub, 
+        df_parity=put_call_parity_sub,
+        section_ordering=subsection_ordering,
+        section_level = subsection_level
+    )
+
+
     for asset in df_pricing['asset_class'].unique():
-        section_ordering += 1
+        
         print(f">>>>>>>>> [Report Generator Agent] Compiling section 2.{section_ordering}: {asset}...")
 
-        df_pricing_sub = df_pricing[df_pricing["asset_class"] == asset]
-        sensitivity_test_results_sub = sensitivity_test_results[sensitivity_test_results["asset_class"] == asset]
-        stress_test_results_sub = stress_test_results[stress_test_results["asset_class"] == asset]
-        put_call_parity_sub = put_call_parity[put_call_parity["asset_class_put"] == asset]
         
-        print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section 2.{section_ordering}: {asset} summary table...")
-        _generate_summary_table(doc, section_ordering, asset)
+        
+        
 
-        print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section 2.{section_ordering}: {asset} pricing summary...")
-        _generate_pricing_summary(doc, llm, asset, df_pricing_sub, section_ordering)
+        
         
         print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section 2.{section_ordering}: {asset} sensitivity test summary...")
         _generate_sensitivity_test_summary(doc, llm, asset, sensitivity_test_results_sub, section_ordering)
@@ -166,7 +185,11 @@ def _add_section_1(doc, heading: str, paragraph: Optional[str]):
 
 
 
-def _generate_summary_table(doc, section_ordering: int, asset: str):
+def _generate_summary_table(
+    doc, 
+    section_ordering: int, 
+    asset: str
+):
     """
     Generates a summary table with 4 columns:
     1. Seq #
@@ -174,7 +197,11 @@ def _generate_summary_table(doc, section_ordering: int, asset: str):
     3. Material
     4. Test Conclusion
     """
-    doc.add_heading(f"2.{section_ordering} Summary Table for {asset}", level=2)
+    paragraph = (
+        "In this section, we will provide a summary of tests to evaluate the performance of the BSM model. "
+    )
+    doc.add_paragraph(paragraph)
+    doc.add_paragraph("")
     
     table = doc.add_table(rows=1, cols=4)
     table.style = 'Table Grid'
@@ -185,13 +212,10 @@ def _generate_summary_table(doc, section_ordering: int, asset: str):
     hdr_cells[2].text = 'Material'
     hdr_cells[3].text = 'Test Conclusion'
     
-    # Define the rows content
-    # Note: The subsection numbering in Material column should match the generated sections
     rows_data = [
-        ("1", "Pricing Summary", f"See Section 2.{section_ordering}.1", ""),
-        ("2", "Sensitivity Test Summary", f"See Section 2.{section_ordering}.2", ""),
-        ("3", "Stress Test Summary", f"See Section 2.{section_ordering}.3", ""),
-        ("4", "Put-Call Parity Summary", f"See Section 2.{section_ordering}.4", ""),
+        ("1", "Diagnostic Test", f"See Section {section_ordering}.1", ""),
+        ("2", "Sensitivity Test", f"See Section {section_ordering}.2", ""),
+        ("3", "Stress Test", f"See Section {section_ordering}.3", ""),
     ]
     
     for seq, test_name, material, conclusion in rows_data:
@@ -201,20 +225,56 @@ def _generate_summary_table(doc, section_ordering: int, asset: str):
         row_cells[2].text = material
         row_cells[3].text = conclusion  # Placeholder
 
-    doc.add_paragraph("")  # Spacer after table
+      # Spacer after table
 
 
-def _generate_pricing_summary(doc, llm, asset: str, df: pd.DataFrame, section_ordering: int):
+
+def _generate_dignostic_summary(
+    doc, 
+    llm, 
+    asset: str, 
+    df_pricing: pd.DataFrame, 
+    df_parity: pd.DataFrame, 
+    section_ordering: str,
+    section_level: int,
+):
     """Generate pricing summary and validation section"""
-    doc.add_heading(f"2.{section_ordering}.1 Summary of Pricing for {asset}", level=3)
-    doc.add_paragraph(f"The pricing output of {asset} listed in the below table,")
+    doc.add_heading(f"{section_ordering} Summary of Diagnostic Test for {asset}", level=section_level)
+
+    print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section {section_ordering}: Data Quality Test...")
     
+    _generate_pricing_summary(
+        doc,
+        llm,
+        asset,
+        df_pricing,
+        section_ordering,
+        section_level,
+    )
+
+    print(f">>>>>>>>>>>> [Report Generator Agent] Compiling section {section_ordering}: Put/Call Parity Test...")
+    _generate_parity_summary(
+        doc,
+        llm,
+        asset,
+        df_parity,
+        section_ordering,
+        section_level,
+    )
+
+
+def _generate_pricing_summary(
+    doc, 
+    llm, 
+    asset: str, 
+    df: pd.DataFrame, 
+    section_ordering: str,
+    section_level: int,
+):
     df = df.sort_values("T").dropna(subset=['price', 'T'])
-
     df_str = df.round(4).to_csv(index=False)
-
     system_prompt_text = (
-        "You are an expert Quantitative Analyst writing a formal component for an Option Pricing Analysis (OPA) Report. "
+        "You are an expert Quantitative Analyst writing a formal component for an Ongoing Performance Analysis (OPA) Report. "
         "Your output will be directly embedded into a professional document for senior management.\n\n"
         "### STRICT GUIDELINES:\n"
         "1. **Tone**: Use strictly professional, objective, and formal financial language. (e.g., Use 'The data indicates...' instead of 'I think...').\n"
@@ -227,64 +287,43 @@ def _generate_pricing_summary(doc, llm, asset: str, df: pd.DataFrame, section_or
 
     prompt_quality = (
         f"Dataset for {asset}:\n{df_str}\n\n"
-        "### Task: Write the 'Data Quality & Integrity' section.\n"
-        "Draft a concise assessment covering:\n"
-        "- Consistency of prices and volatility.\n"
-        "- Alignment of Greeks with Black-Scholes expectations.\n"
-        "- Specific trade anomalies (if any).\n"
-        "Output Format: Bullet points."
-    )
-
-    # prompt_pricing = (
-    #     f"Dataset for {asset}:\n{df_str}\n\n"
-    #     "### Task: Pricing Dynamics & Moneyness Analysis\n"
-    #     "1. Analyze Price relative to Moneyness (S/K). Verify ITM vs OTM pricing levels.\n"
-    #     "2. Explain Call vs Put behavior: Compare Delta/Rho based on parity logic.\n"
-    #     "3. Highlight how deep ITM/OTM status reflects in the Greeks.\n"
-    #     "Output concise bullet points."
-    # )
-
-    prompt_term = (
-        f"Dataset for {asset}:\n{df_str}\n\n"
-        "### Task: Write the 'Term Structure & Time Decay' section.\n"
-        "Draft a concise analysis covering:\n"
-        "- Impact of Time to Maturity (T) on Price, Vega, and Rho.\n"
-        "- Identification of options with the highest Theta decay.\n"
-        "- Gamma risk concentration.\n"
-        "Output Format: Bullet points."
+        "### TASK: Data Quality & Integrity Analysis\n"
+        "Perform a rigorous audit of the variables listed below. For each variable, evaluate: \n"
+        "1) Missingness/Nulls. \n"
+        "2) Physical Reasonability (e.g., date logic). \n"
+        "3) Financial Logic Consistency (Greeks boundaries).\n\n"
+        
+        "STRICT GUIDELINES:\n"
+        "- Start directly with the analysis. No introductory phrases.\n"
+        "- Use the format: **Variable Name**: [Concise assessment].\n\n"
+        
+        "VARIABLES TO AUDIT:\n"
+        "- **date**: Check for missingness and if they align with the current reporting period.\n"
+        "- **S & K**: Spot and Strike must be positive; check if they are within reasonable market proximity.\n"
+        "- **T**: Time to Maturity must be strictly positive (T > 0).\n"
+        "- **r & sigma**: Risk-free rate and Volatility should be non-negative and expressed in decimals.\n"
+        "- **Delta**: Must be [0, 1] for Calls and [-1, 0] for Puts.\n"
+        "- **Gamma & Vega**: Must be strictly non-negative (>= 0) for long positions.\n"
+        "- **Theta**: Should typically be negative (<= 0) for long positions due to time decay.\n"
+        "- **Rho**: Must align with option type (usually positive for Calls, negative for Puts).\n\n"
+        
+        "Output Format: Bullet points starting with the **Bolded Variable Name**."
     )
 
     batch_inputs = [
         [sys_msg, HumanMessage(content=prompt_quality)],
-        # [sys_msg, HumanMessage(content=prompt_pricing)],
-        [sys_msg, HumanMessage(content=prompt_term)]
     ]
     results = llm.batch(batch_inputs)
-
     res_quality = results[0].content
-    res_term = results[1].content
-
-    # summary_prompt = (
-    #     f"Based on the following three analyses for {asset}, provide a 2-sentence 'Final Risk Summary' "
-    #     "identifying the primary exposure (directional, vol, or rates).\n\n"
-    #     f"1. Quality: {res_quality}\n"
-    #     f"2. Pricing: {res_pricing}\n"
-    #     f"3. Term: {res_term}"
-    # )
-
-    # final_risk_msg = llm.invoke([sys_msg, HumanMessage(content=summary_prompt)])
-    # final_risk_summary = final_risk_msg.content
-
 
     full_report = (
-        f"### 1. Data Quality & Integrity\n{res_quality}\n\n"
-        f"### 2. Term Structure & Time Decay\n{res_term}\n\n"
+        f"{"#"*(section_level+1)} {section_ordering}.1 Data Quality & Integrity\n{res_quality}\n\n"
     )
 
     add_markdown_to_docx(doc, full_report)
 
     # Add Figure
-    doc.add_heading(f"2.{section_ordering}.2 Visualization of Pricing for {asset}", level=3)
+    doc.add_paragraph(f"The pricing output of {asset} listed in the below table,")
     for opt_type in ["call", "put"]:
         subset = df[df["option_type"] == opt_type]
         if subset.empty:
@@ -316,14 +355,80 @@ def _generate_pricing_summary(doc, llm, asset: str, df: pd.DataFrame, section_or
         
         plt.close(fig)      
         img_stream.close()  
-
-
-
-
-def _generate_sensitivity_test_summary(doc, llm, asset: str, df: pd.DataFrame, section_ordering: int):
-    """Generate Sensitivity Test Summary"""
-    doc.add_heading(f"2.{section_ordering}.2 Summary of Sensitivity Testing for {asset}", level=3)
+       
+def _generate_parity_summary(
+    doc, 
+    llm, 
+    asset: str, 
+    df: pd.DataFrame, 
+    section_ordering: str,
+    section_level: int,
+):
+    """Generate Gamma Positivity Summary"""
+    # doc.add_heading(f"{section_ordering}.2 Summary of Put-Call Parity Testing for {asset}", level=3)
     
+
+    df_str = df[["underlying", "is_parity_valid", "arbitrage_opportunity"]].to_csv(index=False)
+
+
+    system_prompt_text = (
+        "You are an expert Quantitative Analyst writing a formal component for an Ongoing Performance Analysis (OPA) Report. "
+        "Your output will be directly embedded into a professional document for senior management.\n\n"
+        "### STRICT GUIDELINES:\n"
+        "1. **Tone**: Use strictly professional, objective, and formal financial language. (e.g., Use 'The data indicates...' instead of 'I think...').\n"
+        "2. **No Conversational Fillers**: Do NOT use phrases like 'Okay', 'Let's see', 'Let me check', 'Wait', or 'Here is the analysis'.\n"
+        "3. **No Internal Monologue**: Do NOT output your thinking process. Only output the final analytical conclusions.\n"
+        "4. **Direct Start**: Start directly with the bullet points or the section content.\n"
+        "5. **Formatting**: Use standard Markdown (bolding for key metrics) suitable for a final report."
+    )
+    sys_msg = SystemMessage(content=system_prompt_text)
+
+    user_prompt = (
+        f"Dataset for {asset}:\n{df_str}\n\n"
+        "### TASK: Put Call Parity Check\n"
+        "Please provide a structured analysis:\n"
+        "STRICT GUIDELINES:\n"
+        "- Start directly with the analysis. No introductory phrases.\n"
+        "Group by the underlying, count the number of put/call pairs and how many of them pass the put-call parity test.\n"
+        "If there are any put-call parity violations, show the arbitrage_opportunity.\n"
+        "Output Format: Table with columns: underlying, put_call_pairs_count, fail_count, arbitrage_opportunity."
+    )
+
+    batch_inputs = [
+        [sys_msg, HumanMessage(content=user_prompt)],
+    ]
+    results = llm.batch(batch_inputs)
+    res_quality = results[0].content
+
+
+    full_report = (
+        f"{"#"*(section_level+1)} {section_ordering}.2 Put/Call Parity Check\n{res_quality}\n\n"
+    )
+    add_markdown_to_docx(doc, full_report)
+
+    img_reg, img_dev = create_parity_charts(df, asset)
+    
+    if img_reg:
+        doc.add_paragraph("Visual verification of the parity relationship:")
+        doc.add_picture(img_reg, width=Inches(5))
+        doc.add_paragraph(f"Figure: Parity Regression (LHS vs RHS) for {asset}", style="Caption")
+        
+    if img_dev:
+        doc.add_picture(img_dev, width=Inches(5))
+        doc.add_paragraph(f"Figure: Deviation Magnitude across Strikes for {asset}", style="Caption")
+    
+    add_parity_test_plots(doc, df)
+
+def _generate_sensitivity_test_summary(
+    doc, 
+    llm, 
+    asset: str, 
+    df: pd.DataFrame, 
+    section_ordering: str,
+    section_level: int,
+):
+    doc.add_heading(f"{section_ordering} Summary of Sensitivity Test for {asset}", level=section_level)
+
     df_spot = aggregate_sensitivity_data(df, 'spot')
     df_vol = aggregate_sensitivity_data(df, 'vol')
     df_rate = aggregate_sensitivity_data(df, 'rate')
@@ -443,53 +548,6 @@ def _generate_stress_test_summary(doc, llm, asset: str, df: pd.DataFrame, sectio
     
 
 
-def _generate_parity_summary(doc, llm, asset: str, df: pd.DataFrame, section_ordering: int):
-    """Generate Gamma Positivity Summary"""
-    doc.add_heading(f"2.{section_ordering}.4 Summary of Put-Call Parity Testing for {asset}", level=3)
-    
-
-    _, summary_md = prepare_parity_summary(df)
-
-
-    system_prompt = (
-        "You are an Arbitrage Trader and Quantitative Researcher. "
-        "Your task is to validate the 'Put-Call Parity' relationship for an options portfolio. "
-        "Identify if deviations are noise or actionable arbitrage opportunities.\n\n"
-        "FORMATTING RULES:\n"
-        "1. Do NOT use document titles, dates, or signatures.\n"
-        "2. Start directly with the analysis headers.\n"
-        "3. Be concise and data-driven."
-    )
-    
-    user_prompt = (
-        f"Put-Call Parity Analysis for {asset}:\n\n"
-        f"{summary_md}\n\n"
-        "Please provide a structured analysis:\n"
-        "1. **Model Consistency**: Is the pass rate acceptable? If low, what does it imply about the data quality or market efficiency?\n"
-        "2. **Arbitrage Assessment**: Look at the 'Top 5 Violations'. Are the 'abs_diff' values large enough to cover transaction costs, or are they negligible?\n"
-        "3. **Strike Bias**: (Hypothetically) Does the violation usually occur at deep ITM/OTM strikes due to liquidity issues?\n"
-        "4. **Recommendation**: Should we flag these data points for cleaning, or execute arbitrage trades?"
-    )
-
-    ai_msg = llm.invoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt)
-    ])
-    add_markdown_to_docx(doc, ai_msg.content)
-
-    img_reg, img_dev = create_parity_charts(df, asset)
-    
-    if img_reg:
-        doc.add_paragraph("Visual verification of the parity relationship:")
-        doc.add_picture(img_reg, width=Inches(5))
-        doc.add_paragraph(f"Figure: Parity Regression (LHS vs RHS) for {asset}", style="Caption")
-        
-    if img_dev:
-        doc.add_picture(img_dev, width=Inches(5))
-        doc.add_paragraph(f"Figure: Deviation Magnitude across Strikes for {asset}", style="Caption")
-    
-    add_parity_test_plots(doc, df)
-
 
 
 def _process_inline_formatting(paragraph, text):
@@ -523,12 +581,18 @@ def add_markdown_to_docx(doc, text):
         line = line.strip()
         if not line:
             continue
-
-        if line.startswith('###'):
-            clean_text = line.replace('#', '').strip()
-            clean_text = clean_text.replace('**', '').replace('*', '')
-            doc.add_heading(clean_text, level=3)
-            
+        
+        header_index = False
+        for header_pattern in ["#"*i for i in range(11,2,-1)]:
+            if line.startswith(header_pattern):
+                clean_text = line.replace('#', '').strip()
+                clean_text = clean_text.replace('**', '').replace('*', '')
+                doc.add_heading(clean_text, level=len(header_pattern))
+                header_index = True
+                break
+        
+        if header_index:
+            continue  
         elif line.startswith('**') and line.endswith('**') and len(line) < 80:
             clean_text = line[2:-2].strip()
             doc.add_heading(clean_text, level=3)
