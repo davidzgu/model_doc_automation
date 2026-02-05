@@ -416,7 +416,7 @@ def PnL_attribution_analysis(input_path: str) -> str:
     df = pd.read_csv(input_path)
     
     # Execute Attribution Logic
-    analyzed_df = compute_pnl_attribution(df) # 建议使用之前改好的 compute 命名的函数
+    analyzed_df = compute_pnl_attribution(df)
     
     # Save results
     return _save_to_local(analyzed_df, folder_name="outcome_analysis", prefix="pnl_attribution_report")

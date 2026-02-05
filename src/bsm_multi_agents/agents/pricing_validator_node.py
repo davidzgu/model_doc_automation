@@ -71,6 +71,8 @@ def pricing_validator_agent_node(state: WorkflowState) -> WorkflowState:
         # Clear previous agent's messages to avoid confusion
         messages = []
         messages.append(HumanMessage(content=user_prompt))
+    else:
+        print(f">>> [Pricing Validator Agent] Completed task, moving to next stage")
 
     # 2. Prepend System Prompt (Ephemeral)
     invocation_messages = [SystemMessage(content=system_prompt)] + messages

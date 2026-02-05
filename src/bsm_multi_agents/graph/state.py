@@ -29,12 +29,12 @@ class WorkflowState(TypedDict, total=False):
     final_report_path: str      
 
     # charts
-    chart_paths: List[str]      # 多张图片路径或目录 
+    chart_paths: List[str]  
 
     # tool path
     local_tool_folder_path: str
 
-    # control flags (由 OrchestratorAgent 决定，可选）
+    # control flags
     run_pricing: bool
     run_validation: bool
     run_md_summary: bool

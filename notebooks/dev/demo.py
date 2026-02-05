@@ -1,9 +1,7 @@
 import os
-import sys
 from pathlib import Path
-from IPython.display import Image, display
 
-from bsm_multi_agents.graph.agent_graph import build_app, get_graph_image
+from bsm_multi_agents.graph.agent_graph import build_app
 from bsm_multi_agents.graph.state import WorkflowState
 
 current_file_path = Path(__file__).resolve()
