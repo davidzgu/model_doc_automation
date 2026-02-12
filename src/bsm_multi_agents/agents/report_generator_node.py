@@ -72,7 +72,7 @@ def report_generator_agent_node(state: WorkflowState) -> WorkflowState:
     df_pricing_sub = df_pricing[df_pricing["asset_class"] == asset]
     sensitivity_test_results_sub = sensitivity_test_results[sensitivity_test_results["asset_class"] == asset]
     stress_test_results_sub = stress_test_results[stress_test_results["asset_class"] == asset]
-    put_call_parity_sub = put_call_parity[put_call_parity["asset_class_put"] == asset]
+    put_call_parity_sub = put_call_parity[put_call_parity["asset_class_put"] == asset].drop(columns=['arbitrage_opportunity'])
 
     _generate_summary_table(doc, section_ordering = section_ordering, asset=asset)
     doc.add_paragraph("")
@@ -371,7 +371,7 @@ def _generate_parity_summary(
     # doc.add_heading(f"{section_ordering}.2 Summary of Put-Call Parity Testing for {asset}", level=3)
     
 
-    df_str = df[["underlying", "is_parity_valid", "arbitrage_opportunity"]].to_csv(index=False)
+    df_str = df[["underlying", "is_parity_valid"]].to_csv(index=False)
 
 
     system_prompt_text = (
@@ -393,8 +393,7 @@ def _generate_parity_summary(
         "STRICT GUIDELINES:\n"
         "- Start directly with the analysis. No introductory phrases.\n"
         "Group by the underlying, count the number of put/call pairs and how many of them pass the put-call parity test.\n"
-        "If there are any put-call parity violations, show the arbitrage_opportunity.\n"
-        "Output Format: Table with columns: underlying, put_call_pairs_count, fail_count, arbitrage_opportunity."
+        "Output Format: Table with columns: underlying, put_call_pairs_count, fail_count."
     )
 
     batch_inputs = [
@@ -966,11 +965,6 @@ def prepare_parity_summary(df):
     mean_diff = df['abs_diff'].mean()
     max_diff = df['abs_diff'].max()
     median_diff = df['abs_diff'].median()
-    
-    # 2. Arbitrage Opportunities (Assume threshold > 0.1 or specific column logic)
-    # If 'arbitrage_opportunity' column is boolean:
-    arb_ops = df[df['arbitrage_opportunity'] == True]
-    num_arbs = len(arb_ops)
     
     # 3. Identify Top Violations (Worst 5)
     # Sort by absolute difference descending
